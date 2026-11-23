@@ -25,6 +25,7 @@ const GRAPH = 'https://graph.microsoft.com/v1.0';
 const BASE = typeof location !== 'undefined' ? location.origin + location.pathname.replace(/[^/]*$/, '') : '';
 const REDIRECT = BASE;   // https://mcpoirrigacao.github.io/mcpo360/ (cadastrado no Azure)
 const REG = '_mcpo_permissoes.json';
+const VERSAO = '202611231814';   // muda a cada publicação: força o navegador a buscar os módulos novos
 
 /* ---------------- módulos ----------------
    niveis: do mais alto para o mais baixo.
@@ -326,7 +327,7 @@ function abrirModulo(id) {
   const box = $('tela-modulo');
   if (!IFRAMES[id]) {
     const f = document.createElement('iframe');
-    f.title = MOD[id].nome; f.src = 'modulos/' + MOD[id].dir + '/index.html';
+    f.title = MOD[id].nome; f.src = 'modulos/' + MOD[id].dir + '/index.html?v=' + VERSAO;
     f.setAttribute('allow', 'clipboard-write');
     box.appendChild(f); IFRAMES[id] = f;
   }
