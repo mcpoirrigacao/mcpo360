@@ -175,7 +175,10 @@ function msal_lib() {
 async function token() {
   if (!conta) return null;
   try { return (await msal.acquireTokenSilent({ scopes: CFG.scopes, account: conta })).accessToken; }
-  catch (e) { try { return (await msal.acquireTokenPopup({ scopes: CFG.scopes, account: conta, redirectUri: REDIRECT })).accessToken; } catch (e2) { return null; } }
+  catch (e) {
+    console.warn('MCPO 360: token silencioso falhou', e && (e.errorCode || e.message));
+    pedirLoginDeNovo(); return null;   // popup só com clique (senão o navegador bloqueia)
+  }
 }
 async function g(url, opt) {
   opt = opt || {};
@@ -588,13 +591,29 @@ window.MCPO360 = {
   },
 };
 
+function limparInteracao() {
+  try { [localStorage, sessionStorage].forEach(s => Object.keys(s).filter(k => /interaction\.status|interaction_status/i.test(k)).forEach(k => s.removeItem(k))); } catch (e) {}
+}
+let _pedindo = false;
+function pedirLoginDeNovo() {
+  if (_pedindo) return; _pedindo = true;
+  $('login-erro').textContent = 'Sua sessão precisa ser confirmada. Clique em Entrar.';
+  mostrarTela('login');
+}
 /* ---------------- início ---------------- */
 async function entrar() {
   $('login-erro').textContent = '';
   try {
     const r = await msal.loginPopup({ scopes: CFG.scopes, redirectUri: REDIRECT, prompt: 'select_account' });
-    conta = r.account; msal.setActiveAccount(conta); await depoisDoLogin();
-  } catch (e) { $('login-erro').textContent = 'Não foi possível entrar: ' + (e.errorMessage || e.message || e); }
+    conta = r.account; msal.setActiveAccount(conta);
+    mostrarTela('carregando'); location.reload();   // recomeça já com o login guardado (evita 2º pedido de acesso)
+  } catch (e) {
+    const cod = (e && (e.errorCode || e.message)) || String(e);
+    if (/interaction_in_progress/.test(cod)) { limparInteracao(); $('login-erro').textContent = 'Havia um login pela metade. Clique em Entrar de novo.'; return; }
+    if (/popup_window_error|empty_window_error/.test(cod)) { $('login-erro').textContent = 'O navegador bloqueou a janela de login. Libere pop-ups para mcpoirrigacao.github.io e clique em Entrar de novo.'; return; }
+    if (/user_cancelled/.test(cod)) { $('login-erro').textContent = 'Login cancelado.'; return; }
+    $('login-erro').textContent = 'Não foi possível entrar: ' + (e.errorMessage || e.message || e);
+  }
 }
 async function depoisDoLogin() {
   mostrarTela('carregando');
@@ -608,6 +627,7 @@ async function iniciar() {
   $('btn-sair').onclick = () => msal.logoutPopup({ account: conta, postLogoutRedirectUri: REDIRECT, mainWindowRedirectUri: BASE }).catch(() => { localStorage.clear(); location.reload(); });
   $('btn-menu').onclick = () => $('menu').classList.toggle('aberto');
   window.addEventListener('hashchange', rota);
+  limparInteracao();
   try { if (!window.msal) throw new Error('biblioteca de login não carregou'); await iniciarMsal(); }
   catch (e) { mostrarTela('login'); $('login-erro').textContent = 'Login indisponível: ' + e.message; return; }
   if (!conta) { mostrarTela('login'); return; }
