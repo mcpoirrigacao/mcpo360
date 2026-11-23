@@ -605,8 +605,9 @@ async function entrar() {
   $('login-erro').textContent = '';
   try {
     const r = await msal.loginPopup({ scopes: CFG.scopes, redirectUri: REDIRECT, prompt: 'select_account' });
-    conta = r.account; msal.setActiveAccount(conta);
-    mostrarTela('carregando'); location.reload();   // recomeça já com o login guardado (evita 2º pedido de acesso)
+    conta = r.account || (msal.getAllAccounts()[0] || null); msal.setActiveAccount(conta);
+    _pedindo = false; $('login-erro').textContent = '';
+    await depoisDoLogin();
   } catch (e) {
     const cod = (e && (e.errorCode || e.message)) || String(e);
     if (/interaction_in_progress/.test(cod)) { limparInteracao(); $('login-erro').textContent = 'Havia um login pela metade. Clique em Entrar de novo.'; return; }

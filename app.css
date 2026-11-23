@@ -1,5 +1,6 @@
 :root{--verde-esc:#03590f;--verde:#0a7517;--verde-claro:#1f8c33;--verde-fundo:#e4f1e6;--areia:#f4efe6;--areia-esc:#e8dfd0;--borda:#d9d0bf;--texto:#1e2b22;--suave:#5f6e62;--ferrugem:#c1541c;--erro:#a3312a;--branco:#fff;--topo:56px}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0;height:100%}
 body{font-family:Barlow,system-ui,sans-serif;color:var(--texto);background:var(--areia);font-size:15px}
 h1,h2,h3{font-family:'Barlow Semi Condensed',Barlow,sans-serif;margin:0}
