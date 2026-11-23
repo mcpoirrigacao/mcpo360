@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCPO 360</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="topo">
+  <button class="menu-btn" id="btn-menu" type="button" aria-label="Abrir menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+  <a class="marca" href="#inicio"><span class="marca-m">M</span><span class="marca-nome">MCPO 360</span><span class="marca-sub">MAQCAMPO Irrigação</span></a>
+  <div class="topo-dir">
+    <span class="sync" id="sync-status" hidden></span>
+    <div class="quem" id="quem" hidden><div class="quem-txt"><b id="quem-email"></b><span id="quem-papel"></span></div><button class="btn ghost-claro" id="btn-sair" type="button">Sair</button></div>
+  </div>
+</header>
+
+<div class="corpo">
+  <nav class="menu" id="menu" aria-label="Módulos"></nav>
+  <main class="conteudo" id="conteudo">
+    <section class="tela" id="tela-login" hidden>
+      <div class="cartao login">
+        <h1>MCPO 360</h1>
+        <p>Entre com a sua conta Microsoft da empresa para abrir os módulos liberados para você.</p>
+        <button class="btn primario grande" id="btn-entrar" type="button">Entrar com Microsoft</button>
+        <p class="nota" id="login-erro"></p>
+      </div>
+    </section>
+    <section class="tela" id="tela-carregando"><div class="cartao"><p>Carregando…</p></div></section>
+    <section class="tela" id="tela-sem-acesso" hidden>
+      <div class="cartao login">
+        <h1>Sem acesso</h1>
+        <p>O e-mail <b id="sem-acesso-email"></b> ainda não tem nenhum módulo liberado. Peça a um administrador para liberar seu acesso na Central de acessos.</p>
+        <p class="nota" id="sem-acesso-erro"></p>
+      </div>
+    </section>
+    <section class="tela" id="tela-inicio" hidden></section>
+    <section class="tela" id="tela-central" hidden></section>
+    <section class="tela" id="tela-uso" hidden></section>
+    <section class="tela tela-modulo" id="tela-modulo" hidden></section>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.7.1/lib/msal-browser.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
