@@ -32,35 +32,35 @@ const REG = '_mcpo_permissoes.json';
 const LINK_PAINEL = 'https://maqcampoirrigacao.sharepoint.com/:f:/s/MCPOIRRIGACAO/IgCd79cL3HR6SoDH79MxwSZRAWG2ngJVooBVRaxIJiapAiA?e=jWzmFv';
 const LINK_CRMSAM = 'https://maqcampoirrigacao.sharepoint.com/:f:/s/MCPOIRRIGACAO/IgBGAtqGFxaXRrJhUQ8lzqOJAd3QQQZ_zeb-i3Ox7QMpddU?e=Q8SRTl';
 const MODULOS = [
-  { id: 'painel', dir: 'painel', curto: 'Painel', nome: 'Painel 360', grupo: 'Visão', desc: 'Visão geral dos apps para a diretoria',
+  { id: 'painel', dir: 'painel', sigla: 'PA', curto: 'Painel', nome: 'Painel 360', grupo: 'Visão', desc: 'Visão geral dos apps para a diretoria',
     niveis: ['admin', 'comum'], pasta: { link: LINK_PAINEL, caminhos: ['Painel'] },
     papel: n => n === 'admin' ? 'write' : 'read', le: () => ['assistencia', 'pecas', 'compras', 'obras', 'orcamento', 'crmsam', 'followup', 'treinamentos'] },
-  { id: 'assistencia', dir: 'assistencia', curto: 'Assist.', nome: 'Assistência Técnica', grupo: 'Operação', desc: 'OS, faturamento e comissão dos técnicos',
+  { id: 'assistencia', dir: 'assistencia', sigla: 'AT', curto: 'Assist.', nome: 'Assistência Técnica', grupo: 'Operação', desc: 'OS, faturamento e comissão dos técnicos',
     niveis: ['admin', 'comum'], pasta: { caminhos: ['assistencia'] }, papel: () => 'write',
     acesso: [['assistencia', 'assistencia_acesso.json']] },
-  { id: 'pecas', dir: 'pecas', curto: 'Peças', nome: 'Peças', grupo: 'Operação', desc: 'Faturamento de peças por loja',
+  { id: 'pecas', dir: 'pecas', sigla: 'PÇ', curto: 'Peças', nome: 'Peças', grupo: 'Operação', desc: 'Faturamento de peças por loja',
     niveis: ['admin', 'comum'], pasta: { caminhos: ['Pecas Varejo', 'Faturamento'] }, papel: () => 'write',
     acesso: [['Pecas Varejo', 'pecas_varejo_acesso.json'], ['Pecas Varejo', 'faturamento_acesso.json'], ['Faturamento', 'faturamento_acesso.json']] },
-  { id: 'compras', dir: 'compras', curto: 'Compras', nome: 'Compras e estoque', grupo: 'Operação', desc: 'BI de compras e estoque de peças',
+  { id: 'compras', dir: 'compras', sigla: 'CE', curto: 'Compras', nome: 'Compras e estoque', grupo: 'Operação', desc: 'BI de compras e estoque de peças',
     niveis: ['admin', 'comum'], pasta: { caminhos: ['Compras-estoque'] }, papel: n => n === 'admin' ? 'write' : 'read',
     acesso: [['Compras-estoque', 'compras_pecas_acesso.json']] },
-  { id: 'obras', dir: 'obras', curto: 'Obras', nome: 'Obras de montagem', grupo: 'Operação', desc: 'Clientes, obras, lançamentos e agenda',
+  { id: 'obras', dir: 'obras', sigla: 'OB', curto: 'Obras', nome: 'Obras de montagem', grupo: 'Operação', desc: 'Clientes, obras, lançamentos e agenda',
     niveis: ['admin', 'comum', 'agenda'], rotulos: { agenda: 'Só agenda' }, pasta: { caminhos: ['Execução de Montagem'] },
     papel: n => n === 'admin' ? 'write' : 'read', le: n => n === 'admin' ? ['orcamento'] : [],
     acesso: [['Execução de Montagem', 'mcpo_acesso.json']] },
-  { id: 'orcamento', dir: 'orcamento', curto: 'Orçam.', nome: 'Orçamentação', grupo: 'Operação', desc: 'Orçamento de montagem de pivôs',
+  { id: 'orcamento', dir: 'orcamento', sigla: 'OR', curto: 'Orçam.', nome: 'Orçamentação', grupo: 'Operação', desc: 'Orçamento de montagem de pivôs',
     niveis: ['admin', 'gestor', 'comum'], pasta: { caminhos: ['Orçamentos Montagem/Historico_montagem'] }, papel: () => 'write',
     acesso: [['Orçamentos Montagem/Historico_montagem', 'parametros.json']] },
-  { id: 'crmsam', dir: 'crmsam', curto: 'CRM SAM', nome: 'CRM SAM', grupo: 'Comercial e pessoas', desc: 'Funil de Grandes Contas',
+  { id: 'crmsam', dir: 'crmsam', sigla: 'CS', curto: 'CRM SAM', nome: 'CRM SAM', grupo: 'Comercial e pessoas', desc: 'Funil de Grandes Contas',
     niveis: ['admin', 'editor', 'comum'], rotulos: { editor: 'Editor (só os seus)' }, pasta: { link: LINK_CRMSAM, caminhos: ['CRM SAM'] },
     papel: n => n === 'comum' ? 'read' : 'write', acesso: [['@crmsam', 'crm_sam_acesso.json']] },
-  { id: 'crmcomercial', dir: 'crmcomercial', curto: 'CRM Com.', nome: 'CRM Comercial', grupo: 'Comercial e pessoas', desc: 'CRM MaqCampo (login próprio da planilha)',
+  { id: 'crmcomercial', dir: 'crmcomercial', sigla: 'CC', curto: 'CRM Com.', nome: 'CRM Comercial', grupo: 'Comercial e pessoas', desc: 'CRM MaqCampo (login próprio da planilha)',
     niveis: ['acesso'], rotulos: { acesso: 'Acesso' } },
-  { id: 'followup', dir: 'followup', curto: 'FollowUP', nome: 'FollowUP semanal', grupo: 'Comercial e pessoas', desc: 'Acompanhamento semanal por equipe',
+  { id: 'followup', dir: 'followup', sigla: 'FU', curto: 'FollowUP', nome: 'FollowUP semanal', grupo: 'Comercial e pessoas', desc: 'Acompanhamento semanal por equipe',
     niveis: ['admin', 'equipe', 'visualizador'], rotulos: { equipe: 'Equipe (conforme FollowUP)', visualizador: 'Visualizador' },
     pasta: { caminhos: ['FollowUP'] }, papel: n => n === 'visualizador' ? 'read' : 'write', le: () => ['pecas', 'assistencia', 'treinamentos'],
     acesso: [['FollowUP', 'followup_acesso.json']] },
-  { id: 'treinamentos', dir: 'treinamentos', curto: 'Trein.', nome: 'Treinamentos', grupo: 'Comercial e pessoas', desc: 'Treinamentos de funcionários e clientes',
+  { id: 'treinamentos', dir: 'treinamentos', sigla: 'TR', curto: 'Trein.', nome: 'Treinamentos', grupo: 'Comercial e pessoas', desc: 'Treinamentos de funcionários e clientes',
     niveis: ['admin', 'comum'], pasta: { caminhos: ['TreinamentosMCPO'] }, papel: () => 'write',
     acesso: [['TreinamentosMCPO', 'treinamentos_acesso.json']] },
 ];
@@ -283,21 +283,32 @@ const meusModulos = () => MODULOS.filter(m => NIVEIS[m.id]);
 /* ---------------- telas ---------------- */
 const TELAS = ['login', 'carregando', 'sem-acesso', 'inicio', 'central', 'uso', 'modulo'];
 function mostrarTela(t) { TELAS.forEach(x => $('tela-' + x).hidden = x !== t); }
+const menuItem = (href, nome, ativo, sg, nivel) =>
+  `<a href="#${href}" class="${ativo ? 'ativo' : ''}" title="${esc(nome)}"><span class="ico" aria-hidden="true">${esc(sg)}</span><span class="txt">${esc(nome)}</span>${nivel ? `<span class="nivel">${esc(nivel)}</span>` : ''}</a>`;
 function renderMenu(ativo) {
   const nav = $('menu'); if (!conta) { nav.innerHTML = ''; return; }
-  let h = `<a href="#inicio" class="${ativo === 'inicio' ? 'ativo' : ''}">Início</a>`;
+  const fechado = document.body.classList.contains('menu-fechado');
+  let h = `<button type="button" class="menu-toggle" id="menu-toggle" aria-expanded="${!fechado}" aria-label="${fechado ? 'Abrir menu' : 'Fechar menu'}" title="${fechado ? 'Abrir menu' : 'Fechar menu'}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="${fechado ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'}"/></svg><span class="txt">Recolher menu</span></button>`;
+  h += menuItem('inicio', 'Início', ativo === 'inicio', 'IN');
   let grupo = '';
   for (const m of meusModulos()) {
     if (m.grupo !== grupo) { grupo = m.grupo; h += `<div class="grupo">${esc(grupo)}</div>`; }
-    h += `<a href="#${m.id}" class="${ativo === m.id ? 'ativo' : ''}">${esc(m.nome)}<span class="nivel">${esc(rotulo(m, NIVEIS[m.id]))}</span></a>`;
+    h += menuItem(m.id, m.nome, ativo === m.id, m.sigla, rotulo(m, NIVEIS[m.id]));
   }
   if (ehAdminCentral()) {
     h += `<div class="grupo">Administração</div>`;
-    h += `<a href="#central" class="${ativo === 'central' ? 'ativo' : ''}">Central de acessos</a>`;
-    h += `<a href="#uso" class="${ativo === 'uso' ? 'ativo' : ''}">Uso dos módulos</a>`;
+    h += menuItem('central', 'Central de acessos', ativo === 'central', 'CA');
+    h += menuItem('uso', 'Uso dos módulos', ativo === 'uso', 'US');
   }
   h += `<div class="rodape">Só aparecem os módulos liberados para ${esc(emailAtual())}.</div>`;
   nav.innerHTML = h;
+  $('menu-toggle').onclick = e => { e.stopPropagation(); alternarMenu(); };
+}
+function alternarMenu(forcar) {
+  const fechar = typeof forcar === 'boolean' ? forcar : !document.body.classList.contains('menu-fechado');
+  document.body.classList.toggle('menu-fechado', fechar);
+  try { localStorage.setItem('mcpo360_menu', fechar ? 'fechado' : 'aberto'); } catch (e) {}
+  const r = (location.hash || '#inicio').slice(1) || 'inicio'; renderMenu(r);
 }
 function renderInicio() {
   const mods = meusModulos();
@@ -628,7 +639,10 @@ async function iniciar() {
   if (window.opener && window.opener !== window && /[#&?](code|error|state)=/.test(location.hash + location.search)) { document.body.innerHTML = '<p style="padding:24px;color:#5f6e62;font-family:system-ui">Concluindo o login…</p>'; return; }
   $('btn-entrar').onclick = entrar;
   $('btn-sair').onclick = () => msal.logoutPopup({ account: conta, postLogoutRedirectUri: REDIRECT, mainWindowRedirectUri: BASE }).catch(() => { localStorage.clear(); location.reload(); });
-  $('btn-menu').onclick = () => $('menu').classList.toggle('aberto');
+  $('btn-menu').onclick = () => { if (window.matchMedia('(max-width:860px)').matches) $('menu').classList.toggle('aberto'); else alternarMenu(); };
+  try { if (localStorage.getItem('mcpo360_menu') === 'fechado') document.body.classList.add('menu-fechado'); } catch (e) {}
+  // menu recolhido: clicar numa área vazia da coluna abre de novo
+  $('menu').addEventListener('click', e => { if (document.body.classList.contains('menu-fechado') && !e.target.closest('a,button')) alternarMenu(false); });
   window.addEventListener('hashchange', rota);
   limparInteracao();
   try { if (!window.msal) throw new Error('biblioteca de login não carregou'); await iniciarMsal(); }

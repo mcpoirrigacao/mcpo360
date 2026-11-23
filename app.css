@@ -16,14 +16,15 @@ a{color:var(--verde)}a:hover{color:var(--verde-esc)}
 .quem-txt{display:flex;flex-direction:column;line-height:1.15;text-align:right;font-size:13px}
 .quem-txt span{opacity:.85;font-size:12px}
 .sync{font-size:12px;background:rgba(255,255,255,.15);padding:4px 8px;border-radius:6px}
-.menu-btn{display:none;background:transparent;border:0;color:#fff;cursor:pointer;padding:6px}
+.menu-btn{display:block;background:transparent;border:0;color:#fff;cursor:pointer;padding:6px;border-radius:6px}
+.menu-btn:hover{background:rgba(255,255,255,.14)}
 .corpo{display:flex;min-height:calc(100vh - var(--topo))}
-.menu{width:250px;flex:0 0 250px;background:#fff;border-right:1px solid var(--borda);padding:14px 10px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;height:calc(100vh - var(--topo));position:sticky;top:var(--topo)}
+.menu{width:272px;flex:0 0 272px;transition:width .18s,flex-basis .18s;background:#fff;border-right:1px solid var(--borda);padding:14px 10px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;height:calc(100vh - var(--topo));position:sticky;top:var(--topo)}
 .menu .grupo{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--suave);padding:12px 10px 4px}
 .menu a{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border-radius:8px;color:var(--texto);text-decoration:none}
 .menu a:hover{background:var(--areia)}
 .menu a.ativo{background:var(--verde-fundo);color:var(--verde-esc);font-weight:600}
-.menu .nivel{font-size:11px;color:var(--suave)}
+.menu .nivel{font-size:10.5px;color:var(--suave);white-space:nowrap}
 .menu .rodape{margin-top:auto;padding:12px 10px 4px;font-size:12px;color:var(--suave);line-height:1.4}
 .conteudo{flex:1;min-width:0}
 .tela{padding:24px 28px;max-width:1320px}
@@ -89,3 +90,18 @@ table.t td.adm{color:var(--verde-esc);font-weight:700}
   .marca-sub,.quem-txt span{display:none}
   .tela{padding:16px}
 }
+
+/* ícone + texto no menu, e menu recolhido */
+.menu a .ico{width:28px;height:28px;flex:0 0 28px;border-radius:7px;background:var(--areia);color:var(--verde-esc);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;letter-spacing:.3px}
+.menu a.ativo .ico{background:var(--verde);color:#fff}
+.menu a .txt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.menu a{justify-content:flex-start}
+.menu-toggle{display:flex;align-items:center;gap:10px;width:100%;font:inherit;font-size:13px;color:var(--suave);background:transparent;border:0;border-radius:8px;padding:8px 12px;cursor:pointer;margin-bottom:4px}
+.menu-toggle:hover{background:var(--areia);color:var(--texto)}
+.menu-toggle svg{flex:0 0 28px}
+body.menu-fechado .menu{width:64px;flex-basis:64px;padding-left:8px;padding-right:8px;cursor:pointer}
+body.menu-fechado .menu .txt,body.menu-fechado .menu .nivel,body.menu-fechado .menu .rodape{display:none}
+body.menu-fechado .menu .grupo{font-size:0;padding:6px 0;border-top:1px solid var(--areia-esc);margin:6px 4px 0}
+body.menu-fechado .menu a{justify-content:center;padding:8px 0}
+body.menu-fechado .menu-toggle{justify-content:center;padding:8px 0}
+@media (max-width:860px){ body.menu-fechado .menu{width:272px;flex-basis:272px} body.menu-fechado .menu .txt,body.menu-fechado .menu .nivel{display:initial} }
