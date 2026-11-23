@@ -18,6 +18,7 @@ const CFG = {
   site: '/sites/MCPOIRRIGACAO',
   bib: 'Documentos Compartilhados',
   pasta: 'MCPO360',
+  pastaCrm: 'MCPO360 CRM Comercial',   // só quem tem CRM Comercial lê (senha da planilha)
   scopes: ['Files.ReadWrite', 'Sites.ReadWrite.All', 'User.Read'],
 };
 const GRAPH = 'https://graph.microsoft.com/v1.0';
@@ -116,9 +117,10 @@ function calcularDesejado(acessos) {
     const mods = (u && u.modulos) || {};
     let algum = false;
     for (const [id, nivel] of Object.entries(mods)) {
-      if (id === 'central') { if (nivel === 'admin') { por('mcpo360', email, 'write'); algum = true; } continue; }
+      if (id === 'central') { if (nivel === 'admin') { por('mcpo360', email, 'write'); por('crmcfg', email, 'write'); algum = true; } continue; }
       const m = MOD[id]; if (!m || !m.niveis.includes(nivel)) continue;
       algum = true;
+      if (id === 'crmcomercial') por('crmcfg', email, 'read');
       if (m.pasta && m.papel) por(id, email, m.papel(nivel));
       if (m.le) for (const outro of m.le(nivel)) if (MOD[outro] && MOD[outro].pasta) por(outro, email, 'read');
     }
@@ -203,6 +205,7 @@ async function urlPasta(chave) {
   let url = null;
   if (chave === 'mcpo360') url = await garantirPasta(CFG.pasta);
   else if (chave === 'uso') { await garantirPasta(CFG.pasta); url = await garantirPasta(CFG.pasta + '/uso'); }
+  else if (chave === 'crmcfg') url = await garantirPasta(CFG.pastaCrm);
   else {
     const p = MOD[chave] && MOD[chave].pasta;
     if (p && p.link) {
@@ -365,6 +368,8 @@ function renderCentral() {
     <div class="mods">${todos.map(m => { const v = FORM.mods[m.id] || ''; return `<div class="mod-op ${v ? 'on' : ''}"><label><input type="checkbox" data-mod="${m.id}" ${v ? 'checked' : ''}>${esc(m.nome)}</label><select data-niv="${m.id}" aria-label="Nível em ${esc(m.nome)}" ${v ? '' : 'disabled'}>${m.niveis.map(n => `<option value="${n}" ${v === n ? 'selected' : ''}>${esc(rotulo(m, n))}</option>`).join('')}</select></div>`; }).join('')}</div>
     <div class="form-linha" style="margin-top:14px;justify-content:space-between"><span class="nota">FollowUP “Equipe”: o que a pessoa preenche ou vê continua definido nas equipes dentro do FollowUP.</span>
       <div class="acoes"><button class="btn" id="f-perfil-salvar" type="button">Salvar marcações como perfil</button>${FORM.editando ? '<button class="btn" id="f-cancelar" type="button">Cancelar</button>' : ''}<button class="btn primario" id="f-salvar" type="button">Salvar acesso</button></div></div></div>`;
+  h += `<div class="secao"><h2>CRM Comercial · senha da planilha</h2><div class="cartao"><p class="nota" style="margin:0 0 10px">Fica guardada no SharePoint (pasta “${esc(CFG.pastaCrm)}”), com leitura só para quem tem o CRM Comercial liberado. O módulo usa essa senha para carregar a planilha sozinho.</p>
+    <div class="form-linha"><label class="campo" style="flex:1 1 280px">Senha da planilha<input type="password" id="crm-senha" autocomplete="new-password" placeholder="${CRM_SENHA_OK ? '•••••••• (já cadastrada — digite para trocar)' : 'digite a senha da planilha'}"></label><button class="btn primario" id="crm-salvar" type="button">Salvar senha</button></div></div></div>`;
   h += `<div class="secao"><div class="form-linha" style="justify-content:space-between"><h2>Quem tem acesso (${us.length})</h2><label class="campo" style="flex:0 1 280px"><span class="sr">Filtrar</span><input type="search" id="c-filtro" placeholder="Filtrar por e-mail" value="${esc(FILTRO)}"></label></div>
     <div class="cartao tabela-box"><table class="t"><thead><tr><th>E-mail</th>${todos.map(m => `<th title="${esc(m.nome)}">${esc(m.curto || m.nome)}</th>`).join('')}<th><span class="sr">Ações</span></th></tr></thead><tbody>
     ${vis.length ? vis.map(([e, u]) => `<tr><td><b>${esc(e)}</b></td>${todos.map(m => { const n = (u.modulos || {})[m.id]; return n ? `<td class="${n === 'admin' ? 'adm' : ''}">${esc(ROTULO[n] || n)}</td>` : '<td class="vazio">—</td>'; }).join('')}<td style="white-space:nowrap"><button class="btn pequeno" data-editar="${esc(e)}" type="button">editar</button> <button class="btn pequeno perigo" data-remover="${esc(e)}" type="button">remover</button></td></tr>`).join('') : `<tr><td colspan="${todos.length + 2}" class="vazio">Ninguém cadastrado.</td></tr>`}
@@ -386,6 +391,21 @@ function renderCentral() {
   $('c-importar').onclick = importarListas;
   $('c-sync').onclick = () => sincronizar({ forcar: true, explicito: true });
   $('c-csv').onclick = exportarCsv;
+  $('crm-salvar').onclick = salvarSenhaCrm;
+  if (CRM_SENHA_OK === null) { CRM_SENHA_OK = false; (async () => { try { const r = await lerJson(await urlCaminho(CFG.pastaCrm + '/crm_config.json')); CRM_SENHA_OK = !!(r.ok && r.data && r.data.senhaPlanilha); if (CRM_SENHA_OK && !$('tela-central').hidden) renderCentral(); } catch (e) {} })(); }
+}
+let CRM_SENHA_OK = null;
+async function salvarSenhaCrm() {
+  const s = $('crm-senha').value; if (!s) { toast('Digite a senha.'); return; }
+  try {
+    await garantirPasta(CFG.pastaCrm);
+    const url = await urlCaminho(CFG.pastaCrm + '/crm_config.json');
+    const atual = await lerJson(url);
+    const w = await gravarJson(url, { senhaPlanilha: s, atualizadoEm: new Date().toISOString(), atualizadoPor: emailAtual() }, atual.ok && !atual.missing ? atual.etag : null);
+    if (!w.ok) { toast('Não foi possível salvar a senha (HTTP ' + w.status + ').'); return; }
+    await salvarAcessos(() => [{ txt: 'atualizou a senha da planilha do CRM Comercial' }]);
+    CRM_SENHA_OK = true; toast('Senha salva. Atualizando quem pode ler…'); renderCentral(); sincronizar({});
+  } catch (e) { toast('Erro: ' + e.message); }
 }
 const resumo = mods => Object.entries(mods).map(([id, n]) => ((MOD[id] || CENTRAL).nome) + ': ' + rotulo(MOD[id] || CENTRAL, n)).join(', ') || 'nenhum módulo';
 async function salvarForm() {
@@ -502,10 +522,10 @@ function sincronizar(o) { _fila = _fila.then(() => _sincronizar(o || {})).catch(
 async function _sincronizar({ forcar, explicito }) {
   if (!ehAdminCentral() || !ACESSOS || !Object.keys(ACESSOS.usuarios).length) return;
   const quer = calcularDesejado(ACESSOS);
-  const chaves = [...MODULOS.filter(m => m.pasta).map(m => m.id), 'mcpo360', 'uso'];
+  const chaves = [...MODULOS.filter(m => m.pasta).map(m => m.id), 'mcpo360', 'uso', 'crmcfg'];
   let lib = 0, ret = 0; const falhas = [], pulos = [], linhas = [];
   for (const chave of chaves) {
-    const nome = chave === 'mcpo360' ? 'MCPO360' : chave === 'uso' ? 'MCPO360/uso' : MOD[chave].nome;
+    const nome = chave === 'mcpo360' ? 'MCPO360' : chave === 'uso' ? 'MCPO360/uso' : chave === 'crmcfg' ? CFG.pastaCrm : MOD[chave].nome;
     sync('Sincronizando ' + nome + '…');
     let url; try { url = await urlPasta(chave); } catch (e) { url = null; }
     if (!url) { falhas.push(nome + ': pasta não encontrada'); continue; }
@@ -590,6 +610,8 @@ window.MCPO360 = {
   nivel: id => NIVEIS[id] || null,
   email: () => emailAtual(),
   abrir: id => { location.hash = '#' + id; },
+  /* CRM Comercial: senha da planilha guardada no SharePoint (só quem tem o módulo lê) */
+  senhaCrm: async () => { if (!NIVEIS.crmcomercial) return ''; try { const r = await lerJson(await urlCaminho(CFG.pastaCrm + '/crm_config.json')); return (r.ok && r.data && r.data.senhaPlanilha) || ''; } catch (e) { return ''; } },
   /* FollowUP: quem entra numa equipe precisa de acesso ao módulo. */
   garantirAcesso: async (email, mod, nivel) => {
     email = String(email || '').trim().toLowerCase();

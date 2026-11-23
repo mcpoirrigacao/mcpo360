@@ -6305,10 +6305,13 @@ function aplicarPlanilha(file){
 
   // senha salva: busca sozinho ao abrir
   const senhaSalva = lerSenhaSalva();
-  if(senhaSalva){
-    passInput.value = senhaSalva;
-    passSave.textContent = 'Atualizar';
-    buscarPlanilhaDaWeb(senhaSalva, true);
+  const usarSenha = (s)=>{ passInput.value = s; passSave.textContent = 'Atualizar'; buscarPlanilhaDaWeb(s, true); };
+  /* MCPO 360: a senha da planilha vem do SharePoint (cadastrada na Central de acessos) */
+  let _m360 = null; try{ _m360 = (window.top!==window && window.top.MCPO360) || null; }catch(e){}
+  if(_m360 && _m360.senhaCrm){
+    _m360.senhaCrm().then(s=>{ if(s){ salvarSenha(s); usarSenha(s); } else if(senhaSalva) usarSenha(senhaSalva); }).catch(()=>{ if(senhaSalva) usarSenha(senhaSalva); });
+  } else if(senhaSalva){
+    usarSenha(senhaSalva);
   }
 
   passSave.addEventListener('click', ()=>{
