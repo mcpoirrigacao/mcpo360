@@ -22,7 +22,7 @@ const CFG = {
 };
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 const BASE = typeof location !== 'undefined' ? location.origin + location.pathname.replace(/[^/]*$/, '') : '';
-const REDIRECT = BASE + 'redirect.html';
+const REDIRECT = BASE;   // https://mcpoirrigacao.github.io/mcpo360/ (cadastrado no Azure)
 const REG = '_mcpo_permissoes.json';
 
 /* ---------------- módulos ----------------
@@ -623,6 +623,8 @@ async function depoisDoLogin() {
   rota();
 }
 async function iniciar() {
+  // janela de login (popup) voltando para cá: só deixa a janela principal ler a resposta
+  if (window.opener && window.opener !== window && /[#&?](code|error|state)=/.test(location.hash + location.search)) { document.body.innerHTML = '<p style="padding:24px;color:#5f6e62;font-family:system-ui">Concluindo o login…</p>'; return; }
   $('btn-entrar').onclick = entrar;
   $('btn-sair').onclick = () => msal.logoutPopup({ account: conta, postLogoutRedirectUri: REDIRECT, mainWindowRedirectUri: BASE }).catch(() => { localStorage.clear(); location.reload(); });
   $('btn-menu').onclick = () => $('menu').classList.toggle('aberto');

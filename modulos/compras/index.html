@@ -5328,7 +5328,7 @@ function nivelPorFuncao(){ return null; }
 function mcpoNivelCentral(){ const s=_mcpo360(); return (s && s.nivel(MCPO360_MODULO)) || 'bloqueado'; }
 function mcpoSincronizar(){ return Promise.resolve(); }
 function mcpoGarantirCentral(email,nivel){ const s=_mcpo360(); if(s&&s.garantirAcesso) s.garantirAcesso(email, MCPO360_MODULO, nivel||'equipe'); }
-function getRedirectUri(){ return location.origin + '/mcpo360/redirect.html'; }
+function getRedirectUri(){ return location.origin + '/mcpo360/'; }
 function mcpoBotaoPasta(){
   const a=document.getElementById(MCPO360_ANCORA); if(!a) return;
   const nota='<div class="mcpo360-nota" style="margin:8px 0;padding:12px 14px;background:#e4f1e6;border-radius:8px;color:#03590f;font-size:14px;line-height:1.5">Os acessos deste módulo são gerenciados na <b>Central de acessos</b> do MCPO 360. <button type="button" style="margin-left:6px;font:inherit;font-weight:600;padding:5px 10px;border-radius:6px;border:1px solid #1f8c33;background:#fff;color:#03590f;cursor:pointer" onclick="var s=_mcpo360(); if(s) s.abrir(\'central\');">Abrir a Central de acessos</button></div>';

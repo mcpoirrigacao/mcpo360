@@ -9,7 +9,7 @@ Endereço: https://mcpoirrigacao.github.io/mcpo360/
 | Arquivo | O que é |
 |---|---|
 | `index.html`, `app.css`, `app.js` | Casca: login, menu, início, Central de acessos, uso dos módulos e sincronização das pastas do SharePoint |
-| `redirect.html` | Página de retorno do login (cadastrar no Azure como URI de redirecionamento SPA) |
+| `redirect.html` | Não usado (o login volta para `/mcpo360/`) |
 | `modulos/<id>/index.html` | Cada app antigo, adaptado para rodar dentro do MCPO 360 |
 
 Módulos: `painel`, `assistencia`, `pecas`, `compras`, `obras`, `orcamento`, `crmsam`, `crmcomercial`, `followup`, `treinamentos`.
@@ -30,4 +30,4 @@ Cada pessoa grava um contador por módulo/dia em `MCPO360/uso/<email>.json`. A t
 ## Pré-requisitos no Azure
 
 No registro **MCPO API Github** › Autenticação › Aplicativo de página única, cadastrar:
-`https://mcpoirrigacao.github.io/mcpo360/redirect.html`
+`https://mcpoirrigacao.github.io/mcpo360/` (já cadastrado)
