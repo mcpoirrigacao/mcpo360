@@ -3,7 +3,33 @@
 <head>
 <script>/* MCPO 360: aberto fora do MCPO 360, volta para ele (exceto links de confirmação/avaliação) */
 (function(){try{if(window.top===window&&!/[?&](confirmar|avaliar)=/.test(location.search)){location.replace('../../#obras');}}catch(e){}})();</script>
-<style id="mcpo360-embed">.brand-logo,.topbar-logo,.topbar-divider{display:none!important}</style>
+<style id="mcpo360-embed">
+/* MCPO 360: cabeçalho dos módulos compacto (o MCPO 360 já mostra a marca e o login) */
+.brand-logo,.topbar-logo,.topbar-divider{display:none!important}
+header.app-header{display:flex!important;flex-wrap:wrap;align-items:center;column-gap:18px;row-gap:0;padding:4px 14px 0!important;box-shadow:0 1px 4px rgba(0,0,0,.18)!important}
+header.app-header .brand-row{display:contents!important}
+header.app-header .brand-id,header.app-header .brand-block{order:0;display:flex!important;align-items:center;gap:8px;margin:0!important;padding:0!important}
+header.app-header .brand-sub{font-size:12px!important;letter-spacing:1px;margin:0!important;white-space:nowrap}
+header.app-header .brand-row>div:not(.brand-id):not(.brand-block){order:2;margin-left:auto!important;align-items:center!important;gap:10px!important;padding:2px 0!important}
+header.app-header>nav{order:1;flex:1 1 380px;min-width:0;margin:0!important;padding:0!important;border-top:0!important}
+header.app-header>nav button{padding:9px 11px!important;font-size:13.5px!important}
+header.app-header .ms-info{display:none!important}
+header.app-header .ms-btn{padding:3px 10px!important;font-size:12px!important;min-height:0!important}
+header.app-header .sync-status{font-size:11px!important;margin-top:2px!important}
+header.app-header .ref-box,header.app-header .ctl{gap:2px!important}
+header.app-header .ref-box label,header.app-header .ctl label{font-size:10px!important;margin:0!important}
+header.app-header input,header.app-header select{padding:3px 6px!important;font-size:12px!important}
+.topbar{padding:6px 14px!important;min-height:0!important}
+.topbar h1{font-size:14px!important;margin:0!important}
+header.top{padding:8px 16px!important;gap:10px!important}
+header.top .logo,header.top .sep,header.top #subtitle,header.top .eyebrow{display:none!important}
+header.top h1{font-size:20px!important;margin:0!important}
+header.app-header #btn-ms-login,.topbar #btn-ms-login{display:none!important}
+header.app-header>nav{overflow-x:auto;white-space:nowrap;scrollbar-width:thin}
+header.app-header>nav button{white-space:nowrap}
+header.app-header .week-box{padding:2px 6px!important;gap:6px!important}
+header.app-header .sync-status{display:inline-block}
+</style>
 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
