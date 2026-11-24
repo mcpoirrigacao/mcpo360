@@ -1711,6 +1711,7 @@ const ESQUEMAS={
     {chave:'qtdLances',label:'QTD Lances',tipo:'number',secaoAntes:'Métricas Técnicas'},
     {chave:'qtdBombeamentos',label:'QTD Bombeamentos',tipo:'number'},
     {chave:'adutora',label:'Adutora (m)',tipo:'number'},
+    {chave:'qtdPivos',label:'Pivôs',tipo:'number'},
     {chave:'tarefas',label:'Tarefas Planejadas (Projeto Pivô)',tipo:'tarefasEditor',largo:true},
 
     {chave:'margemOrcada',label:'Margem orçada × executada',tipo:'comparativoMargem',largo:true},
@@ -1802,8 +1803,8 @@ function campoHtmlGenerico(campo,valorAtual){
       `<input type="text" id="${idc}__obs" placeholder="Observação (opcional)" style="width:100%;margin-top:6px;">`;
   }else if(campo.tipo==='tarefasEditor'){
     inputHtml=`<div class="tablewrap" style="max-height:260px;"><table class="dt"><thead><tr><th>Tarefa</th><th class="r">Planejado</th></tr></thead><tbody id="${idc}__lista"></tbody></table></div>`+
-      `<button type="button" class="btn ghost small" id="${idc}__recalcular" style="margin-top:8px;">Recalcular Lances/Bombeamentos/Adutora</button>`+
-      `<span class="nota">Preencha aqui manualmente se a obra não veio de um orçamento, ou ajuste os valores importados. O botão acima só sugere os 3 campos abaixo — eles continuam editáveis.</span>`;
+      `<button type="button" class="btn ghost small" id="${idc}__recalcular" style="margin-top:8px;">Recalcular Lances/Bombeamentos/Adutora/Pivôs</button>`+
+      `<span class="nota">Preencha aqui manualmente se a obra não veio de um orçamento, ou ajuste os valores importados. O botão acima só sugere os 4 campos abaixo — eles continuam editáveis.</span>`;
   }else if(campo.tipo==='cpfMask'){
     inputHtml=`<input type="text" id="${idc}" value="${escapeHtml(formatarCPF(valorAtual||''))}" placeholder="000.000.000-00" maxlength="14" inputmode="numeric">`;
   }else if(campo.tipo==='comparativoMargem'){
@@ -2031,6 +2032,7 @@ function sugerirCamposDeTarefas(tarefas){
     qtdLances:n(tarefas['ELET-002']),
     qtdBombeamentos:n(tarefas['ELET-003']),
     adutora:n(tarefas['MONT-002'])+n(tarefas['MONT-003'])+n(tarefas['MONT-004']),
+    qtdPivos:n(tarefas['ELET-000']),   /* linha "Ligação painel e parametrização (por pivô)" */
   };
 }
 function renderTarefasEditor(){
@@ -2173,6 +2175,7 @@ function abrirModal(entidade,id,seed){
   }
   document.getElementById('campos-modal-registro').innerHTML=esquema.campos.map(campo=>{
     if(campo.tipo==='statusComputado')return campoHtmlGenerico(campo,statusEfetivo(valoresIniciais||{dataInicio:'',prazoDias:null,pausas:[],concluida:false,status:''}));
+    if(campo.chave==='qtdPivos'&&valoresIniciais&&(valoresIniciais.qtdPivos==null||valoresIniciais.qtdPivos==='')&&valoresIniciais.tarefas&&n(valoresIniciais.tarefas['ELET-000']))return campoHtmlGenerico(campo,n(valoresIniciais.tarefas['ELET-000']));
     return campoHtmlGenerico(campo,valoresIniciais?valoresIniciais[campo.chave]:null);
   }).join('')+
     (temBuscaObra?`<datalist id="datalist-obras">${opcoesObrasOrdenadas().map(o=>`<option value="${escapeHtml(o.label)}"></option>`).join('')}</datalist>`:'')+
@@ -2209,7 +2212,8 @@ function abrirModal(entidade,id,seed){
       if(elLances)elLances.value=sug.qtdLances;
       if(elBomb)elBomb.value=sug.qtdBombeamentos;
       if(elAdut)elAdut.value=sug.adutora;
-      toast('Lances/Bombeamentos/Adutora recalculados a partir das tarefas.');
+      const elPiv=document.getElementById('campo-modal-qtdPivos');if(elPiv)elPiv.value=sug.qtdPivos;
+      toast('Lances/Bombeamentos/Adutora/Pivôs recalculados a partir das tarefas.');
     });
     const btnAdd=document.getElementById('campo-modal-pausas__add');
     if(btnAdd)btnAdd.addEventListener('click',()=>{
@@ -2369,7 +2373,7 @@ async function exportarObrasEntregas(){
     const itens=obras.map(o=>{
       const c=clientes.find(x=>x.id===o.clienteId)||{};
       const tecs=Array.from(new Set(alocacoes.filter(a=>a.obraId===o.id).map(a=>{const t=tecnicos.find(x=>x.id===a.tecnicoId);return t?t.nome:'';}).filter(Boolean)));
-      return {obraId:o.id,clienteId:o.clienteId||'',cliente:c.nome||'',regional:c.regional||'',obra:o.nome||'',codProjetos:normalizarCodProjetos(o.codProjetos),qtdLances:n(o.qtdLances),qtdBombeamentos:n(o.qtdBombeamentos),concluida:!!o.concluida,dataNegociacao:o.dataNegociacao||'',dataEntregaMaterial:o.dataEntregaMaterial||'',dataInicio:o.dataInicio||'',dataConclusao:o.concluida?(o.dataConclusao||''):'',tecnicos:tecs};
+      return {obraId:o.id,clienteId:o.clienteId||'',cliente:c.nome||'',regional:c.regional||'',obra:o.nome||'',codProjetos:normalizarCodProjetos(o.codProjetos),qtdLances:n(o.qtdLances),qtdBombeamentos:n(o.qtdBombeamentos),qtdPivos:(o.qtdPivos!==undefined&&o.qtdPivos!==null&&o.qtdPivos!=='')?n(o.qtdPivos):n((o.tarefas||{})['ELET-000']),concluida:!!o.concluida,dataNegociacao:o.dataNegociacao||'',dataEntregaMaterial:o.dataEntregaMaterial||'',dataInicio:o.dataInicio||'',dataConclusao:o.concluida?(o.dataConclusao||''):'',tecnicos:tecs};
     }).sort((a,b)=>String(a.obraId).localeCompare(String(b.obraId)));
     const corpo=JSON.stringify(itens);let h=0;for(let i=0;i<corpo.length;i++)h=(h*31+corpo.charCodeAt(i))|0;
     if(h===_etHash)return;
@@ -2565,6 +2569,7 @@ function mapearOrcamentoParaObra(registro){
     qtdLances:sugestoes.qtdLances,
     qtdBombeamentos:sugestoes.qtdBombeamentos,
     adutora:sugestoes.adutora,
+    qtdPivos:sugestoes.qtdPivos,
     precosImportados,
   };
 }
@@ -2985,12 +2990,12 @@ function mostrarPreviewOrcamento(item){
       <b>Observações da obra (sugeridas):</b> <span style="white-space:pre-wrap;">${escapeHtml(mapa.descricao)}</span><br>
       ${mapa.obsInternas?'':'<span class="nota">Este orçamento não tem observações internas.</span><br>'}
       ${mapa.margemOrcada?`<b>Margem líquida orçada:</b> ${fmtPctMargem(mapa.margemOrcada.margemPct)} (${brl(mapa.margemOrcada.margemValor)}) · <b>Imposto:</b> ${fmtPctMargem(mapa.margemOrcada.impostoPct)} (${brl(mapa.margemOrcada.impostoValor)}) · <b>Custo orçado:</b> ${brl(mapa.margemOrcada.custoOrcado)}${mapa.margemOrcada.estimado?' <span class="reg R2">custo estimado</span>':''}<br>`:''}
-      <b>QTD Lances:</b> ${int(mapa.qtdLances)} · <b>QTD Bombeamentos:</b> ${int(mapa.qtdBombeamentos)} · <b>Adutora:</b> ${int(mapa.adutora)} m<br>
+      <b>QTD Lances:</b> ${int(mapa.qtdLances)} · <b>QTD Bombeamentos:</b> ${int(mapa.qtdBombeamentos)} · <b>Adutora:</b> ${int(mapa.adutora)} m · <b>Pivôs:</b> ${int(mapa.qtdPivos)}<br>
       <b>TMO Total:</b> ${calc.tmoTotal.toLocaleString('pt-BR',{maximumFractionDigits:2})} h ·
       <b>Premiação Montador:</b> ${brl(calc.laborMont)} · <b>Auxiliar:</b> ${brl(calc.laborAux)}
     </div>
     ${seletorCliente}
-    <p class="nota" style="margin:10px 0;">Categoria não vem do orçamento — preencha depois de abrir o cadastro. Lances/Bombeamentos/Adutora vêm sugeridos das tarefas — pode ajustar à mão depois. O TMO/premiação usa a tabela de Tarefas de Montagem de Parâmetros.</p>
+    <p class="nota" style="margin:10px 0;">Categoria não vem do orçamento — preencha depois de abrir o cadastro. Lances/Bombeamentos/Adutora/Pivôs vêm sugeridos das tarefas — pode ajustar à mão depois. O TMO/premiação usa a tabela de Tarefas de Montagem de Parâmetros.</p>
     <button class="btn primary small" id="btn-usar-orcamento" type="button">Usar estes dados</button>
     <span id="status-usar-orcamento" style="font-size:.78rem;color:var(--texto-suave);margin-left:8px;"></span>
   `;
@@ -3019,7 +3024,7 @@ function mostrarPreviewOrcamento(item){
       saveCache();
     }
     document.getElementById('overlay-importar-orcamento').style.display='none';
-    abrirModal('obra',null,{clienteId:cliente?cliente.id:'',nome:mapa.nomeObra,valorNegociado:mapa.valorNegociado,dataNegociacao:mapa.dataNegociacao,prazoDias:mapa.prazoDias,descricao:mapa.descricao,margemOrcada:mapa.margemOrcada,tarefas:mapa.tarefas,precosImportados:mapa.precosImportados,qtdLances:mapa.qtdLances,qtdBombeamentos:mapa.qtdBombeamentos,adutora:mapa.adutora});
+    abrirModal('obra',null,{clienteId:cliente?cliente.id:'',nome:mapa.nomeObra,valorNegociado:mapa.valorNegociado,dataNegociacao:mapa.dataNegociacao,prazoDias:mapa.prazoDias,descricao:mapa.descricao,margemOrcada:mapa.margemOrcada,tarefas:mapa.tarefas,precosImportados:mapa.precosImportados,qtdLances:mapa.qtdLances,qtdBombeamentos:mapa.qtdBombeamentos,adutora:mapa.adutora,qtdPivos:mapa.qtdPivos});
   });
 }
 

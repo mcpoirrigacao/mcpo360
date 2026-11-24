@@ -298,6 +298,32 @@ body:not(.pode-editar) .so-editor{display:none !important;}
 .obra-card .oc-g span{display:block;font-size:.62rem;text-transform:uppercase;letter-spacing:.5px;color:var(--texto-suave);font-weight:700;}
 .obra-card .oc-g b{font-size:.84rem;}
 @media (max-width:700px){.obra-card .oc-g{grid-template-columns:repeat(2,minmax(0,1fr));}}
+.raias{display:grid;grid-template-columns:230px repeat(6,minmax(140px,1fr));gap:4px;overflow-x:auto;align-items:stretch;}
+.rz-h{display:contents;}
+.rz-h>div{position:sticky;top:0;background:var(--azul-escuro);color:#fff;font-size:.72rem;font-weight:700;padding:7px 8px;border-radius:4px;display:flex;align-items:center;gap:6px;z-index:1;}
+.rz-h .n{width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.2);display:inline-flex;align-items:center;justify-content:center;font-size:.62rem;}
+.rz-cli{grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#ebe4d6;border-radius:6px;padding:8px 10px;margin-top:6px;cursor:pointer;}
+.rz-cli b{font-size:.92rem;}.rz-cli .tg{color:var(--azul-claro);font-size:.8rem;}
+.rz-row{display:contents;}
+.rz-o{background:#fff;border:1px solid var(--borda);border-left:4px solid var(--ferrugem);border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;gap:3px;font-size:.78rem;}
+.rz-o b{font-size:.84rem;line-height:1.25;}.rz-o small{color:var(--texto-suave);font-size:.7rem;}
+.rz-o a{color:var(--azul);text-decoration:none;}
+.rz-o .acao-btn{align-self:flex-start;margin-top:3px;}
+.rz-c{border:1px dashed var(--areia-escura);border-radius:6px;padding:4px;display:flex;flex-direction:column;gap:4px;min-height:56px;}
+.lt{text-align:left;border:1px solid var(--borda);border-left:4px solid var(--cinza);background:#fff;border-radius:5px;padding:5px 7px;font-size:.74rem;cursor:pointer;font-family:var(--fonte-corpo);color:var(--texto);line-height:1.3;}
+.lt:hover{border-color:var(--azul-claro);}
+.lt small{display:block;color:var(--texto-suave);font-size:.66rem;margin-top:1px;}
+.lt.st-atrasada,.lt.st-div{border-left-color:var(--vermelho);background:#fbefee;}
+.lt.st-div{box-shadow:0 0 0 1px var(--vermelho) inset;}
+.lt.st-atencao{border-left-color:var(--amarelo);background:#fdf8e8;}
+.lt.st-noprazo,.lt.st-agendada{border-left-color:var(--amarelo);}
+.lt.st-concluida{border-left-color:var(--ok);background:#eef6ef;}
+.lt.st-semprev{border-left-color:var(--cinza);}
+.lt.saldo,.lt.virtual{border-style:dashed;border-left-style:solid;border-left-color:var(--ferrugem);background:#fffdf7;}
+.pbar{height:6px;background:var(--areia-escura);border-radius:3px;display:flex;overflow:hidden;margin:2px 0;}
+.pbar i{display:block;height:100%;}.pbar .pg{background:var(--ok);}.pbar .an{background:var(--amarelo);}
+tr.grp td{background:#f5f1e8;font-size:.8rem;}tr.grp a{color:var(--azul);text-decoration:none;margin-left:6px;}
+tr.grp .pbar{max-width:320px;margin-top:5px;}
 </style>
 </head>
 <body>
@@ -333,7 +359,7 @@ body:not(.pode-editar) .so-editor{display:none !important;}
   <!-- ============ QUADRO ============ -->
   <section class="pane active" id="pane-quadro">
     <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px;">
-      <div style="flex:1;min-width:240px;"><h2 class="pane-title">Fluxo das entregas</h2><p class="pane-desc" style="margin:0;">Cada coluna é uma etapa. As entregas paradas há mais tempo aparecem primeiro. Obras concluídas na montagem entram sozinhas em “Pendente ET”.</p></div>
+      <div style="flex:1;min-width:240px;"><h2 class="pane-title">Fluxo das entregas</h2><p class="pane-desc" style="margin:0;">Cada linha é uma obra do cliente; cada entrega técnica (parcial ou total) é um lote na coluna da sua etapa. Obras concluídas na montagem entram sozinhas em “Pendente ET”.</p></div>
       <button class="btn primary so-editor" id="btn-nova" type="button">+ Nova entrega técnica</button>
     </div>
     <div class="kpis" id="kpis"></div>
@@ -342,7 +368,7 @@ body:not(.pode-editar) .so-editor{display:none !important;}
       <input type="search" id="q-busca" placeholder="Buscar cliente, fazenda, obra ou número…">
       <select id="q-consultor"></select>
       <select id="q-prazo"><option value="">Todos os prazos</option><option value="atrasada">Só atrasadas</option><option value="atencao">Só em atenção</option><option value="div">Só com divergência</option></select>
-      <div class="vis-switch" id="vis-switch"><button type="button" data-v="quadro" class="on">▦ Quadro</button><button type="button" data-v="lista">☰ Lista</button></div>
+      <label class="chk" id="q-conc-wrap" style="display:inline-flex;"><input type="checkbox" id="q-concluidos"> Mostrar concluídos</label><div class="vis-switch" id="vis-switch"><button type="button" data-v="raias" class="on">☷ Por obra</button><button type="button" data-v="quadro">▦ Por lote</button><button type="button" data-v="lista">☰ Lista</button></div>
     </div>
     <div class="etapas-chips" id="etapas-chips" style="display:none"></div>
     <div id="quadro"></div>
@@ -518,7 +544,7 @@ const CONFIG_DEFAULT={
   emailModelo:'Prezados,\n\nSegue a entrega técnica {numero} para aprovação.\n\nCliente: {cliente}\nFazenda: {fazenda}\nEquipamentos: {itens}\nConsultor: {consultor}\nConcluída em campo: {termino}\n\nDocumentos: {pasta}\n\nAtenciosamente,\nMCPO Irrigação',
   corteObras:'2026-11-01',
 };
-const COLS=['entregas','pastas','ignoradas'];
+const COLS=['entregas','pastas','ignoradas','grupos'];
 function defaultState(){const s={config:clone(CONFIG_DEFAULT)};COLS.forEach(c=>s[c]={});return s;}
 function normalizeState(s){
   s=s&&typeof s==='object'?s:{};
@@ -628,6 +654,41 @@ function pendenciasObras(){
 }
 function obraPorId(id){return OBRAS.find(o=>o.obraId===id)||null;}
 
+/* ---------------- grupos: cliente → obra → lotes ----------------
+   Cada entrega técnica é um LOTE de um grupo. Grupo = a obra do módulo Obras (obraId);
+   sem obra = cliente + fazenda, ou um grupo escolhido à mão (grupoId).
+   Total de pivôs = campo "Pivôs" da obra; pode ser ajustado por grupo (state.grupos[key].totalPivos). */
+function grupoKey(e){if(e.obraId)return 'obra:'+e.obraId;if(e.grupoId)return e.grupoId;return 'cf:'+chave(e.cliente)+'|'+chave(e.fazenda);}
+function dataLote(e){return e.inicio||e.termino||e.emailFabrica||e.aprovacao||e.pagamento||(e.criadoEm||'').slice(0,10)||'9999';}
+const ORD_ST={atrasada:0,atencao:1,semprev:2,noprazo:3,agendada:3,concluida:4};
+let LOTE={};
+function montarGrupos(){
+  const G=new Map();LOTE={};
+  const add=(k,base)=>{if(!G.has(k))G.set(k,Object.assign({key:k,lotes:[],virtual:null},base));return G.get(k);};
+  live('entregas').forEach(e=>{const k=grupoKey(e);const o=e.obraId?obraPorId(e.obraId):null;const g=add(k,{cliente:e.cliente,fazenda:e.fazenda||'',obraId:e.obraId||'',obra:o?o.obra:(e.obra||''),obraRef:o});g.lotes.push(e);if(!g.fazenda&&e.fazenda)g.fazenda=e.fazenda;});
+  pendenciasObras().forEach(v=>{const g=add('obra:'+v.obraId,{cliente:v.cliente,fazenda:'',obraId:v.obraId,obra:v.obra,obraRef:obraPorId(v.obraId)});g.virtual=v;});
+  G.forEach(g=>{
+    g.lotes.sort((a,b)=>dataLote(a).localeCompare(dataLote(b))||String(a.numero||'').localeCompare(String(b.numero||'')));
+    g.lotes.forEach((e,i)=>{LOTE[e.id]={n:i+1,de:g.lotes.length,key:g.key};});
+    const ov=getRec('grupos',g.key);const temOv=ov&&ov.totalPivos!=null&&ov.totalPivos!=='';
+    const totObra=g.obraRef?nNum(g.obraRef.qtdPivos):0;
+    g.feitos=g.lotes.reduce((a,e)=>a+pivos(e),0);
+    g.pagos=g.lotes.filter(e=>etapa(e)==='paga').reduce((a,e)=>a+pivos(e),0);
+    g.total=temOv?nNum(ov.totalPivos):(totObra||g.feitos);
+    g.totalOrigem=temOv?'manual':(totObra?'obra':'lotes');g.totalObra=totObra;
+    g.saldo=Math.max(0,g.total-g.feitos);
+    g.abertos=g.lotes.filter(e=>ABERTAS.includes(etapa(e)));
+    g.div=g.abertos.some(divAtiva);
+    g.pior=g.abertos.map(e=>prazo(e).st).sort((a,b)=>(ORD_ST[a]??5)-(ORD_ST[b]??5))[0]||(g.virtual?prazo(g.virtual).st:(g.lotes.length?'concluida':'semprev'));
+    g.nome=g.obra||g.fazenda||'Entregas sem obra / fazenda';
+    g.cods=g.obraRef&&g.obraRef.codProjetos||[];
+    g.ativo=!!(g.abertos.length||g.virtual||(g.saldo>0&&g.totalOrigem!=='lotes'));
+  });
+  return G;
+}
+function rotuloLote(e){const l=LOTE[e.id];return l?`Lote ${l.n}/${l.de}`:'';}
+function nomeGrupo(key){const G=montarGrupos();const g=G.get(key);return g?g.nome:'';}
+
 /* ---------------- acesso ---------------- */
 var MCPO360_MODULO='entregas';
 function _mcpo360(){try{if(window.top!==window&&window.top.MCPO360)return window.top.MCPO360;}catch(e){}try{if(window.parent!==window&&window.parent.MCPO360)return window.parent.MCPO360;}catch(e){}return null;}
@@ -659,7 +720,7 @@ document.querySelectorAll('#mod-switch button').forEach(b=>b.onclick=()=>setMod(
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>irAba(b.dataset.tab));
 
 /* ---------------- filtros do quadro ---------------- */
-let VISAO=(()=>{try{return localStorage.getItem(STORE_KEY+'-vis')==='lista'?'lista':'quadro';}catch(e){return 'quadro';}})();
+let VISAO=(()=>{try{const v=localStorage.getItem(STORE_KEY+'-vis2');return ['raias','quadro','lista'].includes(v)?v:'raias';}catch(e){return 'raias';}})();
 let FILTRO_ETAPA='',FILTRO_KPI='';const COL_ABERTA={};
 function todasComVirtuais(){return [...live('entregas'),...pendenciasObras()];}
 function bateBusca(e,q){if(!q)return true;const k=chave(q);return chave([e.numero,e.cliente,e.fazenda,e.obra,itensResumo(e),e.consultor].join(' ')).includes(k);}
@@ -680,7 +741,8 @@ function filtradasQuadro(){
   });
 }
 ['q-busca','q-consultor','q-prazo'].forEach(id=>$(id).addEventListener(id==='q-busca'?'input':'change',renderQuadro));
-document.querySelectorAll('#vis-switch button').forEach(b=>b.onclick=()=>{VISAO=b.dataset.v;try{localStorage.setItem(STORE_KEY+'-vis',VISAO);}catch(e){}renderQuadro();});
+$('q-concluidos').addEventListener('change',()=>{$('q-conc-wrap').classList.toggle('on',$('q-concluidos').checked);renderQuadro();});
+document.querySelectorAll('#vis-switch button').forEach(b=>b.onclick=()=>{VISAO=b.dataset.v;try{localStorage.setItem(STORE_KEY+'-vis2',VISAO);}catch(e){}renderQuadro();});
 
 function ordenarPorParada(a,b){const pa=prazo(a),pb=prazo(b);const ra=pa.lim?(pa.dias||0)/pa.lim:(pa.dias||0)/30,rb=pb.lim?(pb.dias||0)/pb.lim:(pb.dias||0)/30;return (divAtiva(b)-divAtiva(a))||(rb-ra)||String(a.cliente).localeCompare(String(b.cliente),'pt-BR');}
 function bdgPrazo(pr){if(pr.st==='agendada')return `<span class="bdg noprazo">Agendada ${fmtDc(pr.ref)}</span>`;return `<span class="bdg ${pr.st}">${PRAZO_INFO[pr.st]}</span>`;}
@@ -695,7 +757,7 @@ function textoDias(pr){
 function cardHtml(e){
   const pr=prazo(e),div=divAtiva(e);const et=pr.et;
   const acao=ETAPA[et].acao;const nAnx=(e.anexos||[]).length;
-  const sub=[e.fazenda||e.obra,itensResumo(e)].filter(Boolean).join(' · ');
+  const sub=[e.obra||e.fazenda,rotuloLote(e),itensResumo(e)].filter(Boolean).join(' · ');
   return `<div class="etc p-${pr.st}${div?' div':''}${e.virtual?' virtual':''}" data-card="${esc(e.id)}">
     <div class="bdgs">${bdgPrazo(pr)}${div?'<span class="bdg div">Divergência</span>':''}${e.virtual||e.obraId?'<span class="bdg montagem">Montagem</span>':''}</div>
     <div class="tt">${esc(e.cliente)}</div>
@@ -711,7 +773,7 @@ function ligarCards(raiz){
   raiz.querySelectorAll('[data-card]').forEach(el=>el.onclick=ev=>{if(ev.target.closest('button'))return;abrirEntrega(el.dataset.card);});
   raiz.querySelectorAll('[data-acao]').forEach(b=>b.onclick=()=>acaoEtapa(b.dataset.acao));
   raiz.querySelectorAll('[data-ignorar]').forEach(b=>b.onclick=()=>ignorarObra(b.dataset.ignorar));
-  raiz.querySelectorAll('[data-abrir]').forEach(el=>el.onclick=ev=>{if(ev.target.closest('a,button'))return;abrirEntrega(el.dataset.abrir);});
+  raiz.querySelectorAll('[data-abrir]').forEach(el=>el.onclick=ev=>{const b=ev.target.closest('a,button');if(b&&b!==el)return;abrirEntrega(el.dataset.abrir);});
 }
 
 /* ---------------- KPIs ---------------- */
@@ -735,8 +797,10 @@ function renderQuadro(){
   setSel('q-consultor',listaConsultores(),'Todos os consultores');
   renderKpis();
   document.querySelectorAll('#vis-switch button').forEach(b=>b.classList.toggle('on',b.dataset.v===VISAO));
-  const lista=filtradasQuadro();const el=$('quadro');
+  montarGrupos();const lista=filtradasQuadro();const el=$('quadro');
+  $('q-conc-wrap').style.display=VISAO==='raias'?'':'none';
   if(VISAO==='lista'){renderLista(lista);return;}
+  if(VISAO==='raias'){$('etapas-chips').style.display='none';renderRaias(lista);return;}
   $('etapas-chips').style.display='none';
   const corte30=addDias(hojeISO(),-30);
   el.innerHTML=`<div class="quadro">${ETAPAS.map((et,i)=>{
@@ -755,6 +819,67 @@ function renderQuadro(){
   el.querySelectorAll('[data-hist]').forEach(b=>b.onclick=()=>irAba('tabela'));
   ligarCards(el);
 }
+const CLI_FECHADO=new Set(),CLI_ABERTO_R=new Set();
+function bdgSt(st){return `<span class="bdg ${st}">${PRAZO_INFO[st]||st}</span>`;}
+function barraPivos(g){if(!g.total)return '';const p=v=>Math.min(100,v/g.total*100);return `<div class="pbar" title="${g.pagos} pago(s) · ${g.feitos-g.pagos} em andamento · ${g.saldo} sem ET"><i class="pg" style="width:${p(g.pagos)}%"></i><i class="an" style="width:${p(g.feitos-g.pagos)}%"></i></div>`;}
+function textoPivos(g){if(!g.total&&!g.feitos)return 'sem pivôs informados';return `${g.feitos} de ${g.total} pivô(s) com ET${g.totalOrigem==='manual'?' <span class="muted">(ajustado)</span>':g.totalOrigem==='lotes'?' <span class="muted">(soma dos lotes)</span>':''}`;}
+function renderRaias(lista){
+  const G=montarGrupos();const ids=new Set(lista.map(e=>e.id));
+  const filtro=!!($('q-busca').value||$('q-consultor').value||$('q-prazo').value||FILTRO_KPI);
+  const mostrarConc=$('q-concluidos').checked||!!$('q-busca').value;
+  const clis=new Map();
+  G.forEach(g=>{
+    const lotes=g.lotes.filter(e=>ids.has(e.id));const vOk=!!(g.virtual&&ids.has(g.virtual.id));
+    const q=$('q-busca').value;const saldoOk=!$('q-consultor').value&&!$('q-prazo').value&&(!FILTRO_KPI||FILTRO_KPI==='aberto')&&g.saldo>0&&g.totalOrigem!=='lotes'&&(!q||chave([g.cliente,g.obra,g.fazenda,g.cods.join(' ')].join(' ')).includes(chave(q)));
+    if(!lotes.length&&!vOk&&!saldoOk)return;
+    if(!g.ativo&&!mostrarConc)return;
+    const k=chave(g.cliente);if(!clis.has(k))clis.set(k,{k,nome:g.cliente,grupos:[]});
+    clis.get(k).grupos.push(Object.assign({},g,{vis:lotes,vOk,saldoOk}));
+  });
+  const C=[...clis.values()].map(c=>{const ab=c.grupos.reduce((a,g)=>a+g.abertos.length+(g.virtual?1:0),0);const pior=c.grupos.map(g=>g.pior).sort((a,b)=>(ORD_ST[a]??5)-(ORD_ST[b]??5))[0];
+    return Object.assign(c,{ab,pior,div:c.grupos.some(g=>g.div),atr:c.grupos.reduce((a,g)=>a+g.abertos.filter(e=>prazo(e).st==='atrasada').length,0),tot:c.grupos.reduce((a,g)=>a+g.total,0),feitos:c.grupos.reduce((a,g)=>a+g.feitos,0),pagos:c.grupos.reduce((a,g)=>a+g.pagos,0),lotes:c.grupos.reduce((a,g)=>a+g.lotes.length,0)});})
+    .sort((a,b)=>(ORD_ST[a.pior]??5)-(ORD_ST[b.pior]??5)||b.atr-a.atr||b.ab-a.ab||a.nome.localeCompare(b.nome,'pt-BR'));
+  const cab=`<div class="rz-h"><div>Cliente / obra</div>${ETAPAS.map((et,i)=>`<div><span class="n">${i+1}</span>${esc(et.nome)}</div>`).join('')}</div>`;
+  const chip=e=>{const pr=prazo(e);const st=divAtiva(e)?'div':pr.st;const l=LOTE[e.id];
+    return `<button type="button" class="lt st-${st}" data-abrir="${esc(e.id)}" title="${esc((e.numero||'')+' · '+itensResumo(e)+(e.consultor?' · '+e.consultor:''))}"><b>${l?'Lote '+l.n:'Lote'}</b> · ${esc(itensResumo(e)||'—')}<small>${pr.et==='paga'?'paga '+fmtDc(e.pagamento):pr.dias==null?'sem data':pr.dias<0?'começa em '+(-pr.dias)+'d':pr.dias+'d'+(divAtiva(e)?' · divergência':'')}${e.consultor?' · '+esc(e.consultor.split(' ')[0]):''}</small></button>`;};
+  const linhas=C.map(c=>{
+    const aberto=c.ab?!CLI_FECHADO.has(c.k):CLI_ABERTO_R.has(c.k)||!!$('q-busca').value;
+    const head=`<div class="rz-cli${aberto?' on':''}" data-cli="${esc(c.k)}"><span class="tg">${aberto?'▾':'▸'}</span><b>${esc(c.nome)}</b><span class="muted">${c.grupos.length} obra(s) · ${c.lotes} lote(s)${c.tot?` · ${c.feitos} de ${c.tot} pivôs`:''}</span>${c.ab?(c.atr?'':bdgSt(c.pior)):'<span class="bdg concluida">tudo pago</span>'}${c.atr?`<span class="bdg atrasada">${c.atr} atrasado(s)</span>`:''}${c.div?'<span class="bdg div">Divergência</span>':''}</div>`;
+    if(!aberto)return head;
+    return head+c.grupos.sort((a,b)=>(b.ativo-a.ativo)||(ORD_ST[a.pior]??5)-(ORD_ST[b.pior]??5)||a.nome.localeCompare(b.nome,'pt-BR')).map(g=>{
+      const cel=ETAPAS.map(et=>{
+        let h=g.vis.filter(e=>etapa(e)===et.id).map(chip).join('');
+        if(et.id==='pendente'){
+          if(g.vOk)h+=`<button type="button" class="lt st-${prazo(g.virtual).st} virtual" data-acao="${esc(g.virtual.id)}"><b>Obra concluída</b> ${fmtDc(g.virtual.dataConclusaoObra)}<small class="so-editor">Iniciar ET →</small></button>`;
+          if(g.saldoOk&&g.lotes.length)h+=`<button type="button" class="lt saldo" data-saldo="${esc(g.key)}"><b>Saldo: ${g.saldo} pivô(s)</b> sem ET<small class="so-editor">+ criar lote</small></button>`;
+        }
+        return `<div class="rz-c">${h}</div>`;}).join('');
+      return `<div class="rz-row"><div class="rz-o"><b>${esc(g.nome)}</b><small>${g.cods.length?'Projeto '+esc(g.cods.join(', '))+' · ':''}${g.lotes.length} lote(s)${g.obraId?'':' · sem obra'}</small>${barraPivos(g)}<small>${textoPivos(g)} <a href="#" class="so-editor" data-total="${esc(g.key)}" title="Ajustar o total de pivôs">✎</a></small><button type="button" class="acao-btn sec so-editor" data-novo-lote="${esc(g.key)}">+ lote</button></div>${cel}</div>`;
+    }).join('');
+  }).join('');
+  $('quadro').innerHTML=`<div class="raias">${cab}${linhas||'<div class="qvazio" style="grid-column:1/-1">Nenhuma entrega com esses filtros.</div>'}</div><p class="muted" style="margin-top:8px;">Verde = paga · amarelo = andando · vermelho = atrasada ou com divergência · tracejado = saldo da obra ainda sem entrega técnica. Clientes sem nada em aberto ficam ocultos (marque “Mostrar concluídos”).</p>`;
+  const el=$('quadro');
+  el.querySelectorAll('[data-cli]').forEach(h=>h.onclick=()=>{const k=h.dataset.cli;const c=C.find(x=>x.k===k);if(c&&c.ab){CLI_FECHADO.has(k)?CLI_FECHADO.delete(k):CLI_FECHADO.add(k);}else{CLI_ABERTO_R.has(k)?CLI_ABERTO_R.delete(k):CLI_ABERTO_R.add(k);}renderQuadro();});
+  el.querySelectorAll('[data-saldo]').forEach(b=>b.onclick=()=>{if(podeEditar())novoLote(b.dataset.saldo);});
+  el.querySelectorAll('[data-novo-lote]').forEach(b=>b.onclick=()=>novoLote(b.dataset.novoLote));
+  el.querySelectorAll('[data-total]').forEach(a=>a.onclick=ev=>{ev.preventDefault();editarTotal(a.dataset.total);});
+  ligarCards(el);
+}
+function novoLote(key){
+  if(!podeEditar())return;const g=montarGrupos().get(key);if(!g)return;
+  if(g.virtual&&!g.lotes.length){abrirEntrega(g.virtual.id);return;}
+  const base=g.lotes[g.lotes.length-1]||{};
+  abrirEntrega(null,{cliente:g.cliente,fazenda:g.fazenda||base.fazenda||'',obraId:g.obraId||'',obra:g.obra||'',grupoId:!g.obraId&&key.startsWith('g:')?key:'',dataConclusaoObra:g.obraRef&&g.obraRef.dataConclusao||'',consultor:base.consultor||'',itens:[{tipo:'Pivô completo',qtd:g.saldo||1,obs:''}]});
+}
+function editarTotal(key){
+  if(!podeEditar())return;const g=montarGrupos().get(key);if(!g)return;
+  modal('Total de pivôs — '+g.nome,`<p style="margin:0 0 10px;"><b>${esc(g.cliente)}</b> · ${esc(g.nome)}</p>
+    <div class="grid">${fld('g-total','Total de pivôs do grupo',g.total)}</div>
+    <p class="muted" style="margin-top:8px;">${g.obraId?`Campo “Pivôs” da obra no módulo Obras: <b>${g.totalObra||'não preenchido'}</b>. `:''}Soma dos lotes: <b>${g.feitos}</b>. ${g.totalOrigem==='manual'?'Hoje está ajustado à mão.':''}</p>`,[
+    g.totalOrigem==='manual'?{t:g.obraId?'Voltar ao total da obra':'Voltar à soma dos lotes',left:true,fn:()=>{delRec('grupos',key);save();fecharModal();renderAll();}}:null,
+    {t:'Cancelar',fn:fecharModal},
+    {t:'Salvar',cls:'primary',fn:()=>{const v=Math.max(0,Math.round(n($('g-total').value)));putRec('grupos',key,{totalPivos:v,cliente:g.cliente,nome:g.nome});save();fecharModal();renderAll();toast('Total ajustado.');}}]);
+}
 function renderLista(lista){
   const chips=$('etapas-chips');chips.style.display='flex';
   const cont=id=>lista.filter(e=>etapa(e)===id).length;
@@ -762,7 +887,7 @@ function renderLista(lista){
   chips.querySelectorAll('[data-et]').forEach(b=>b.onclick=()=>{FILTRO_ETAPA=b.dataset.et;renderQuadro();});
   let L=lista;if(FILTRO_ETAPA==='div')L=L.filter(divAtiva);else if(FILTRO_ETAPA)L=L.filter(e=>etapa(e)===FILTRO_ETAPA);
   L=L.slice().sort((a,b)=>ETAPA[etapa(a)].i-ETAPA[etapa(b)].i||ordenarPorParada(a,b));
-  $('quadro').innerHTML=`<div class="card"><div class="tablewrap"><table class="dt" style="min-width:1050px;"><thead><tr><th>Nº</th><th>Cliente / fazenda</th><th>Equipamentos</th><th>Consultor</th><th>Etapa</th><th>Prazo</th><th class="r">Dias</th><th>Desde</th><th class="c">📎</th><th></th></tr></thead><tbody>${L.map(e=>{const pr=prazo(e);return `<tr class="click" data-abrir="${esc(e.id)}"><td class="nw">${esc(e.numero||'—')}</td><td><b>${esc(e.cliente)}</b>${e.fazenda?'<br><span class="muted">'+esc(e.fazenda)+'</span>':''}</td><td>${esc(itensResumo(e))}</td><td>${esc(e.consultor||'—')}</td><td>${bdgEtapa(pr.et)}${divAtiva(e)?' <span class="bdg div">Divergência</span>':''}</td><td>${bdgPrazo(pr)}</td><td class="num">${pr.dias==null?'—':pr.dias}</td><td class="nw">${fmtD(pr.ref)}</td><td class="c">${(e.anexos||[]).length||''}</td><td>${ETAPA[pr.et].acao?`<button class="acao-btn so-editor" type="button" data-acao="${esc(e.id)}">${e.virtual?'Iniciar ET':esc(ETAPA[pr.et].acao)}</button>`:''}</td></tr>`;}).join('')||'<tr><td colspan="10" class="empty">Nenhuma entrega com esses filtros.</td></tr>'}</tbody></table></div></div>`;
+  $('quadro').innerHTML=`<div class="card"><div class="tablewrap"><table class="dt" style="min-width:1050px;"><thead><tr><th>Nº</th><th>Cliente / fazenda</th><th>Obra / lote</th><th>Equipamentos</th><th>Consultor</th><th>Etapa</th><th>Prazo</th><th class="r">Dias</th><th>Desde</th><th class="c">📎</th><th></th></tr></thead><tbody>${L.map(e=>{const pr=prazo(e);return `<tr class="click" data-abrir="${esc(e.id)}"><td class="nw">${esc(e.numero||'—')}</td><td><b>${esc(e.cliente)}</b>${e.fazenda?'<br><span class="muted">'+esc(e.fazenda)+'</span>':''}</td><td>${esc(e.obra||'')}${e.obra?'<br>':''}<span class="muted">${esc(rotuloLote(e))}</span></td><td>${esc(itensResumo(e))}</td><td>${esc(e.consultor||'—')}</td><td>${bdgEtapa(pr.et)}${divAtiva(e)?' <span class="bdg div">Divergência</span>':''}</td><td>${bdgPrazo(pr)}</td><td class="num">${pr.dias==null?'—':pr.dias}</td><td class="nw">${fmtD(pr.ref)}</td><td class="c">${(e.anexos||[]).length||''}</td><td>${ETAPA[pr.et].acao?`<button class="acao-btn so-editor" type="button" data-acao="${esc(e.id)}">${e.virtual?'Iniciar ET':esc(ETAPA[pr.et].acao)}</button>`:''}</td></tr>`;}).join('')||'<tr><td colspan="11" class="empty">Nenhuma entrega com esses filtros.</td></tr>'}</tbody></table></div></div>`;
   ligarCards($('quadro'));
 }
 
@@ -776,13 +901,18 @@ function renderClientes(){
   if(q)G=G.filter(g=>chave(g.nome).includes(chave(q))||g.itens.some(e=>bateBusca(e,q)));
   if(f==='abertas')G=G.filter(g=>g.ab);if(f==='atrasadas')G=G.filter(g=>g.atr);
   G.sort((a,b)=>b.atr-a.atr||b.ab-a.ab||a.nome.localeCompare(b.nome,'pt-BR'));
+  const GR=montarGrupos();
   $('lista-clientes').innerHTML=G.map(g=>{
     const pasta=getRec('pastas',g.k);
-    const rows=g.itens.slice().sort((a,b)=>String(b.termino||b.inicio||b.dataConclusaoObra||'').localeCompare(String(a.termino||a.inicio||a.dataConclusaoObra||''))).map(e=>{const pr=prazo(e);return `<tr class="click" data-abrir="${esc(e.id)}"><td class="nw">${esc(e.numero||'—')}</td><td>${esc(e.fazenda||e.obra||'—')}</td><td>${esc(itensResumo(e))}</td><td>${esc(e.consultor||'—')}</td><td>${bdgEtapa(pr.et)}${divAtiva(e)?' <span class="bdg div">Divergência</span>':''}</td><td>${bdgPrazo(pr)}</td><td class="nw">${fmtD(e.termino)}</td><td class="nw">${fmtD(e.pagamento)}</td><td class="c">${(e.anexos||[]).length||''}${e.pasta&&e.pasta.webUrl?` <a href="${esc(e.pasta.webUrl)}" target="_blank" rel="noopener" title="Pasta da entrega">📁</a>`:''}</td></tr>`;}).join('');
-    return `<details class="cli-grupo" data-k="${esc(g.k)}"${CLI_ABERTO.has(g.k)?' open':''}><summary><b>${esc(g.nome)}</b><span class="muted">${g.itens.length} entrega(s)${g.pv?' · '+g.pv+' pivô(s)':''}</span>${g.ab?`<span class="bdg etapa">${g.ab} em aberto</span>`:'<span class="bdg concluida">tudo pago</span>'}${g.atr?`<span class="bdg atrasada">${g.atr} atrasada(s)</span>`:''}${g.div?'<span class="bdg div">Divergência</span>':''}${pasta&&pasta.webUrl?`<a class="btn ghost tiny" href="${esc(pasta.webUrl)}" target="_blank" rel="noopener">📁 Pasta do cliente</a>`:''}</summary>
-      <div class="tablewrap"><table class="dt" style="min-width:900px;"><thead><tr><th>Nº</th><th>Fazenda / obra</th><th>Equipamentos</th><th>Consultor</th><th>Etapa</th><th>Prazo</th><th>Término</th><th>Pagamento</th><th class="c">📎</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
+    const meus=[...GR.values()].filter(x=>chave(x.cliente)===g.k);
+    const linhaE=e=>{const pr=prazo(e);return `<tr class="click" data-abrir="${esc(e.id)}"><td class="nw">${esc(e.numero||'—')}</td><td>${esc(rotuloLote(e)||'—')}</td><td>${esc(itensResumo(e))}</td><td>${esc(e.consultor||'—')}</td><td>${bdgEtapa(pr.et)}${divAtiva(e)?' <span class="bdg div">Divergência</span>':''}</td><td>${bdgPrazo(pr)}</td><td class="nw">${fmtD(e.termino)}</td><td class="nw">${fmtD(e.pagamento)}</td><td class="c">${(e.anexos||[]).length||''}${e.pasta&&e.pasta.webUrl?` <a href="${esc(e.pasta.webUrl)}" target="_blank" rel="noopener" title="Pasta da entrega">📁</a>`:''}</td></tr>`;};
+    const rows=meus.sort((a,b)=>(b.ativo-a.ativo)||a.nome.localeCompare(b.nome,'pt-BR')).map(x=>`<tr class="grp"><td colspan="9"><b>${esc(x.nome)}</b>${x.cods.length?' · Projeto '+esc(x.cods.join(', ')):''} · ${textoPivos(x)}${x.saldo>0&&x.totalOrigem!=='lotes'?` · <b style="color:var(--ferrugem)">saldo ${x.saldo} sem ET</b>`:''} <a href="#" class="so-editor" data-total="${esc(x.key)}">✎ total</a> <a href="#" class="so-editor" data-novo-lote="${esc(x.key)}">+ lote</a>${barraPivos(x)}</td></tr>`+(x.virtual?`<tr class="click" data-abrir="${esc(x.virtual.id)}"><td class="nw">—</td><td>—</td><td>${esc(x.virtual.itensTxt||'')}</td><td>—</td><td>${bdgEtapa('pendente')}</td><td>${bdgPrazo(prazo(x.virtual))}</td><td class="nw" colspan="3">obra concluída ${fmtD(x.virtual.dataConclusaoObra)}</td></tr>`:'')+x.lotes.map(linhaE).join('')).join('');
+    return `<details class="cli-grupo" data-k="${esc(g.k)}"${CLI_ABERTO.has(g.k)?' open':''}><summary><b>${esc(g.nome)}</b><span class="muted">${meus.length} obra(s) · ${g.itens.filter(e=>!e.virtual).length} lote(s)${g.pv?' · '+g.pv+' pivô(s)':''}</span>${g.ab?`<span class="bdg etapa">${g.ab} em aberto</span>`:'<span class="bdg concluida">tudo pago</span>'}${g.atr?`<span class="bdg atrasada">${g.atr} atrasada(s)</span>`:''}${g.div?'<span class="bdg div">Divergência</span>':''}${pasta&&pasta.webUrl?`<a class="btn ghost tiny" href="${esc(pasta.webUrl)}" target="_blank" rel="noopener">📁 Pasta do cliente</a>`:''}</summary>
+      <div class="tablewrap"><table class="dt" style="min-width:900px;"><thead><tr><th>Nº</th><th>Lote</th><th>Equipamentos</th><th>Consultor</th><th>Etapa</th><th>Prazo</th><th>Término</th><th>Pagamento</th><th class="c">📎</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
   }).join('')||'<div class="empty">Nenhum cliente encontrado.</div>';
   $('lista-clientes').querySelectorAll('details').forEach(d=>d.addEventListener('toggle',()=>{d.open?CLI_ABERTO.add(d.dataset.k):CLI_ABERTO.delete(d.dataset.k);}));
+  $('lista-clientes').querySelectorAll('[data-total]').forEach(a=>a.onclick=ev=>{ev.preventDefault();editarTotal(a.dataset.total);});
+  $('lista-clientes').querySelectorAll('[data-novo-lote]').forEach(a=>a.onclick=ev=>{ev.preventDefault();novoLote(a.dataset.novoLote);});
   ligarCards($('lista-clientes'));
 }
 $('c-busca').addEventListener('input',renderClientes);$('c-filtro').addEventListener('change',renderClientes);
@@ -798,15 +928,15 @@ function linhasTabela(){
 function renderTabela(){
   setSel('t-etapa',[...ETAPAS.map(e=>({v:e.id,l:e.nome})),{v:'div',l:'Com divergência'}],'Todas as etapas');
   setSel('t-consultor',listaConsultores(),'Todos os consultores');setSel('t-ano',anosLista(),'Todos os anos');
-  const L=linhasTabela();$('t-count').textContent=L.length+' entrega(s)';
-  $('tbl-entregas').innerHTML=`<thead><tr><th>Nº</th><th>Cliente / fazenda</th><th>Etapa</th><th>Equipamentos</th><th>Consultor</th><th>Início</th><th>Término</th><th class="r">Duração</th><th>E-mail fábrica</th><th>Aprovação</th><th class="r">Dur. aprov.</th><th>Pagamento</th><th>Prazo</th><th class="c">📎</th></tr></thead><tbody>${L.map(e=>{const pr=prazo(e);const du=e.inicio&&e.termino?difDias(e.inicio,e.termino)+1:null;const da=e.emailFabrica&&e.aprovacao?difDias(e.emailFabrica,e.aprovacao):null;return `<tr class="click" data-abrir="${esc(e.id)}"><td class="nw">${esc(e.numero||'—')}</td><td><b>${esc(e.cliente)}</b>${e.fazenda?'<br><span class="muted">'+esc(e.fazenda)+'</span>':''}</td><td>${bdgEtapa(pr.et)}${divAtiva(e)?' <span class="bdg div">Div.</span>':''}</td><td>${esc(itensResumo(e))}</td><td>${esc(e.consultor||'—')}</td><td class="nw">${fmtD(e.inicio)}</td><td class="nw">${fmtD(e.termino)}</td><td class="num">${du==null?'':du}</td><td class="nw">${fmtD(e.emailFabrica)}</td><td class="nw">${fmtD(e.aprovacao)}${e.aprovada&&!e.aprovacao?'<span class="muted">aprovada</span>':''}</td><td class="num">${da==null?'':da}</td><td class="nw">${fmtD(e.pagamento)}</td><td>${bdgPrazo(pr)}</td><td class="c">${(e.anexos||[]).length||''}</td></tr>`;}).join('')||'<tr><td colspan="14" class="empty">Nenhuma entrega.</td></tr>'}</tbody>`;
+  montarGrupos();const L=linhasTabela();$('t-count').textContent=L.length+' entrega(s)';
+  $('tbl-entregas').innerHTML=`<thead><tr><th>Nº</th><th>Cliente / fazenda</th><th>Obra / lote</th><th>Etapa</th><th>Equipamentos</th><th>Consultor</th><th>Início</th><th>Término</th><th class="r">Duração</th><th>E-mail fábrica</th><th>Aprovação</th><th class="r">Dur. aprov.</th><th>Pagamento</th><th>Prazo</th><th class="c">📎</th></tr></thead><tbody>${L.map(e=>{const pr=prazo(e);const du=e.inicio&&e.termino?difDias(e.inicio,e.termino)+1:null;const da=e.emailFabrica&&e.aprovacao?difDias(e.emailFabrica,e.aprovacao):null;return `<tr class="click" data-abrir="${esc(e.id)}"><td class="nw">${esc(e.numero||'—')}</td><td><b>${esc(e.cliente)}</b>${e.fazenda?'<br><span class="muted">'+esc(e.fazenda)+'</span>':''}</td><td>${esc(e.obra||'')}${e.obra?'<br>':''}<span class="muted">${esc(rotuloLote(e))}</span></td><td>${bdgEtapa(pr.et)}${divAtiva(e)?' <span class="bdg div">Div.</span>':''}</td><td>${esc(itensResumo(e))}</td><td>${esc(e.consultor||'—')}</td><td class="nw">${fmtD(e.inicio)}</td><td class="nw">${fmtD(e.termino)}</td><td class="num">${du==null?'':du}</td><td class="nw">${fmtD(e.emailFabrica)}</td><td class="nw">${fmtD(e.aprovacao)}${e.aprovada&&!e.aprovacao?'<span class="muted">aprovada</span>':''}</td><td class="num">${da==null?'':da}</td><td class="nw">${fmtD(e.pagamento)}</td><td>${bdgPrazo(pr)}</td><td class="c">${(e.anexos||[]).length||''}</td></tr>`;}).join('')||'<tr><td colspan="15" class="empty">Nenhuma entrega.</td></tr>'}</tbody>`;
   ligarCards($('tbl-entregas'));
 }
 ['t-busca'].forEach(id=>$(id).addEventListener('input',renderTabela));['t-etapa','t-consultor','t-ano'].forEach(id=>$(id).addEventListener('change',renderTabela));
 $('t-excel').onclick=async()=>{
   try{await loadXlsx();}catch(e){toast('Não foi possível carregar o Excel.');return;}
-  const L=linhasTabela();
-  const rows=L.map(e=>{const pr=prazo(e);return {'Nº':e.numero||'','Cliente':e.cliente,'Fazenda':e.fazenda||'','Obra (montagem)':e.obra||'','Etapa':ETAPA[pr.et].nome,'Divergência':divAtiva(e)?(e.divergencia.motivo||'sim'):'','Equipamentos':itensResumo(e),'Pivôs':pivos(e)||'','Consultor':e.consultor||'','Início':fmtD(e.inicio),'Término':fmtD(e.termino),'Duração (dias)':e.inicio&&e.termino?difDias(e.inicio,e.termino)+1:'','E-mail fábrica':fmtD(e.emailFabrica),'Aprovação':fmtD(e.aprovacao),'Duração aprovação':e.emailFabrica&&e.aprovacao?difDias(e.emailFabrica,e.aprovacao):'','Pagamento':fmtD(e.pagamento),'Valor (R$)':nNum(e.valor)||'','NF / cobrança':e.nf||'','Prazo':PRAZO_INFO[pr.st]||'','Dias na etapa':pr.dias==null?'':pr.dias,'Anexos':(e.anexos||[]).length,'Pasta':e.pasta&&e.pasta.webUrl||''};});
+  montarGrupos();const L=linhasTabela();
+  const rows=L.map(e=>{const pr=prazo(e);return {'Nº':e.numero||'','Cliente':e.cliente,'Fazenda':e.fazenda||'','Obra (montagem)':e.obra||'','Lote':rotuloLote(e),'Etapa':ETAPA[pr.et].nome,'Divergência':divAtiva(e)?(e.divergencia.motivo||'sim'):'','Equipamentos':itensResumo(e),'Pivôs':pivos(e)||'','Consultor':e.consultor||'','Início':fmtD(e.inicio),'Término':fmtD(e.termino),'Duração (dias)':e.inicio&&e.termino?difDias(e.inicio,e.termino)+1:'','E-mail fábrica':fmtD(e.emailFabrica),'Aprovação':fmtD(e.aprovacao),'Duração aprovação':e.emailFabrica&&e.aprovacao?difDias(e.emailFabrica,e.aprovacao):'','Pagamento':fmtD(e.pagamento),'Valor (R$)':nNum(e.valor)||'','NF / cobrança':e.nf||'','Prazo':PRAZO_INFO[pr.st]||'','Dias na etapa':pr.dias==null?'':pr.dias,'Anexos':(e.anexos||[]).length,'Pasta':e.pasta&&e.pasta.webUrl||''};});
   const ws=XLSX.utils.json_to_sheet(rows);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Entregas');XLSX.writeFile(wb,'entrega_tecnica_'+hojeISO()+'.xlsx');
 };
 
@@ -954,16 +1084,18 @@ function abrirEntrega(id,preset){
   else e=Object.assign({cliente:'',fazenda:'',obra:'',obraId:'',itens:[{tipo:'Pivô completo',qtd:1,obs:''}],consultor:'',inicio:'',termino:'',emailFabrica:'',aprovacao:'',pagamento:'',divergencia:{ativa:false,motivo:''},valor:'',nf:'',obs:'',anexos:[]},preset||{});
   EDIT={id,e};
   const pode=podeEditar(),dis=!pode;
+  const GRS=montarGrupos();const lt=id?LOTE[id]:null;const gAtual=GRS.get(grupoKey(e));
   const cliList=uniq([...live('entregas').map(x=>x.cliente),...OBRAS.map(o=>o.cliente)]);
   const obra=obraPorId(e.obraId);
   const div=e.divergencia||{ativa:false,motivo:''};
-  const corpo=`${passosHtml(e)}
+  const corpo=`${lt||gAtual?`<p class="muted" style="margin:-4px 0 10px;">${lt?`<b>Lote ${lt.n} de ${lt.de}</b> · `:'Novo lote · '}${esc(gAtual?gAtual.nome:(e.obra||e.fazenda||e.cliente))}${gAtual?' · '+textoPivos(gAtual):''}</p>`:''}${passosHtml(e)}
   ${e.importado?'<div class="note">Entrega importada da planilha antiga — confira os equipamentos.</div>':''}
   <div class="lbl-sec">Cliente</div>
   <div class="grid3">${fld('m-cliente','Cliente <span class="req">*</span>',e.cliente,{list:'dl-cli',dis})}${fld('m-fazenda','Fazenda',e.fazenda,{dis})}${fld('m-consultor','Consultor',null,{type:'select',options:opts(opcoesConsultor(e.consultor),e.consultor,'— escolha —'),dis})}</div>
   <datalist id="dl-cli">${cliList.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
   <div class="lbl-sec">Obra da montagem <span class="muted" style="text-transform:none;font-weight:400;">(ligação com o módulo Obras)</span></div>
   <div class="obra-pick" id="m-obra-pick">${dis?'':`<input type="search" id="m-obra-busca" placeholder="Buscar obra por cliente, obra ou cód. projeto…" autocomplete="off"><div class="obra-res" id="m-obra-res"></div>`}<div id="m-obra-sel"></div></div>
+  <div id="m-grupo-wrap"></div>
   <div class="lbl-sec">Equipamentos ${e.itensTxt?`<span class="muted" style="text-transform:none;font-weight:400;">(planilha: “${esc(e.itensTxt)}”)</span>`:''}</div>
   <div class="itens-ed" id="m-itens"></div>
   ${pode?'<button class="btn ghost tiny" id="m-add-item" type="button" style="margin-top:6px;">+ equipamento</button>':''}
@@ -985,6 +1117,7 @@ function abrirEntrega(id,preset){
   modal(titulo,corpo,[
     id&&ehAdmin()?{t:'Excluir',cls:'danger',left:true,fn:()=>excluirEntrega(id)}:null,
     {t:pode?'Cancelar':'Fechar',fn:fecharModal},
+    id&&pode&&ETAPA[etapa(e)].acao?{t:ETAPA[etapa(e)].acao+' →',fn:()=>{fecharModal();acaoEtapa(id);}}:null,
     pode?{t:'Salvar',cls:'primary',fn:()=>salvarEntrega()}:null,
   ],()=>{EDIT=null;});
   renderItensEd();renderAnexosEd();renderObraSel();
@@ -1013,7 +1146,19 @@ function escolherObra(id){
   if(o){EDIT.e.obra=o.obra;if(!val('m-cliente'))$('m-cliente').value=o.cliente;}
   const r=$('m-obra-res');if(r)r.innerHTML='';const bx=$('m-obra-busca');if(bx)bx.value='';renderObraSel();
 }
+function renderGrupoSel(){
+  const el=$('m-grupo-wrap');if(!el||!EDIT)return;
+  if(EDIT.e.obraId){el.innerHTML='';return;}
+  const cli=chave(val('m-cliente')||EDIT.e.cliente);const G=montarGrupos();
+  const atual=EDIT.e.grupoId||('cf:'+cli+'|'+chave(val('m-fazenda')||EDIT.e.fazenda));
+  const L=[...G.values()].filter(g=>!g.obraId&&chave(g.cliente)===cli).map(g=>({v:g.key,l:`${g.nome} (${g.lotes.length} lote(s))`}));
+  if(!L.some(x=>x.v===atual))L.unshift({v:atual,l:(atual.startsWith('g:')?'Grupo separado':'Cliente + fazenda')+' (novo)'});
+  L.push({v:'__novo',l:'+ Separar num grupo novo'});
+  el.innerHTML=`<div class="grid" style="margin-top:10px;">${fld('m-grupo','Agrupar com (entregas sem obra)',null,{type:'select',options:opts(L,atual),dis:!podeEditar(),full:true})}</div>`;
+  const sel=$('m-grupo');if(sel)sel.onchange=()=>{if(sel.value==='__novo'){EDIT.e.grupoId='g:'+uid('g');renderGrupoSel();}else EDIT.e.grupoId=sel.value;};
+}
 function renderObraSel(){
+  renderGrupoSel();
   const el=$('m-obra-sel');if(!el||!EDIT)return;const id=EDIT.e.obraId;const o=id?obraPorId(id):null;const pode=podeEditar();
   if(!id){el.innerHTML='<div class="muted" style="margin-top:6px;">Entrega avulsa, sem obra vinculada.</div>';return;}
   const x=o||{cliente:EDIT.e.cliente,obra:EDIT.e.obra||'(obra vinculada)',codProjetos:EDIT.e.codProjetos||[],dataConclusao:EDIT.e.dataConclusaoObra};
@@ -1025,7 +1170,7 @@ function renderObraSel(){
 }
 function sugerirTipoAnexo(e){const et=etapa(e);if(et==='andamento'||et==='pendente')return 'termo';if(et==='envio'||et==='fabrica')return 'fabrica';if(et==='pagamento')return 'pagamento';return 'outro';}
 function novaDeObra(v){
-  const o=obraPorId(v.obraId)||{};const it=[];if(o.qtdBombeamentos)it.push({tipo:'Bombeamento',qtd:o.qtdBombeamentos,obs:''});
+  const o=obraPorId(v.obraId)||{};const it=[];if(nNum(o.qtdPivos))it.push({tipo:'Pivô completo',qtd:nNum(o.qtdPivos),obs:''});if(o.qtdBombeamentos)it.push({tipo:'Bombeamento',qtd:o.qtdBombeamentos,obs:''});
   return {cliente:v.cliente,fazenda:'',obra:o.obra||v.obra||'',obraId:v.obraId,dataConclusaoObra:o.dataConclusao||'',itens:it.length?it:[{tipo:'Pivô completo',qtd:1,obs:''}],consultor:'',inicio:hojeISO(),termino:'',emailFabrica:'',aprovacao:'',pagamento:'',divergencia:{ativa:false,motivo:''},valor:'',nf:'',obs:'',anexos:[]};
 }
 function renderItensEd(){
@@ -1045,6 +1190,7 @@ function lerForm(e){
   e.cliente=val('m-cliente');e.fazenda=val('m-fazenda');e.consultor=$('m-consultor').value;e.consultorEmail=emailDoConsultor(e.consultor)||(e.consultor===EDIT.e.consultor?EDIT.e.consultorEmail||'':'');
   const ob=EDIT.e.obraId||'';if(ob!==(e.obraId||'')||ob){const o=obraPorId(ob);e.obraId=ob;if(o||!ob){e.obra=o?o.obra:'';e.dataConclusaoObra=o?o.dataConclusao||'':'';e.codProjetos=o?o.codProjetos||[]:[];}}
   e.itens=(EDIT.e.itens||[]).filter(i=>i.tipo&&(nNum(i.qtd)>0||i.obs));
+  { const sel=$('m-grupo');let gid=e.obraId?'':(sel?sel.value:(EDIT.e.grupoId||''));if(gid==='__novo')gid=EDIT.e.grupoId||'';const nat='cf:'+chave(e.cliente)+'|'+chave(e.fazenda);e.grupoId=(!gid||gid===nat)?'':gid; }
   e.inicio=$('m-inicio').value;e.termino=$('m-termino').value;e.emailFabrica=$('m-email').value;e.aprovacao=$('m-aprovacao').value;e.pagamento=$('m-pagamento').value;
   e.valor=val('m-valor');e.nf=val('m-nf');e.obs=$('m-obs').value.trim();
   const ativa=$('m-div').checked,mot=val('m-div-motivo');const antes=e.divergencia||{ativa:false};

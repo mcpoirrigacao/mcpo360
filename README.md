@@ -41,3 +41,4 @@ No registro **MCPO API Github** › Autenticação › Aplicativo de página ún
 - Níveis: Admin (tudo + Parâmetros), Consultor (cria/atualiza entregas e anexos), Comum (só visualiza). Funções do Azure: `Entregas.Admin`, `Entregas.Consultor`, `Entregas.Comum`.
 - Admins do Obras recebem escrita na pasta da Entrega Técnica (para gravar `obras_concluidas.json`).
 - Etapas: Pendente ET → Em andamento → Enviar à fábrica → Aguardando fábrica → Aguardando pagamento → Paga; divergência é uma marca na entrega.
+- Grupos: cliente → obra → lotes. Cada entrega técnica é um lote da obra (`obraId`); sem obra, o grupo é cliente + fazenda ou um grupo escolhido (`grupoId`). Total de pivôs = campo "Pivôs" da obra (Obras; sugerido pela tarefa ELET-000 "Ligação painel e parametrização (por pivô)"), ajustável por grupo em `grupos/<chave>.totalPivos`.
