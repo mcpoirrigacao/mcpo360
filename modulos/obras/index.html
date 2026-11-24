@@ -2357,7 +2357,7 @@ document.getElementById('btn-excluir-registro').addEventListener('click',async()
 /* ============================ RENDER GERAL / ABAS ============================ */
 /* ==================== ENTREGA TÉCNICA: obras concluídas ====================
    O admin do Obras grava em "Entrega Técnica/_dados/obras_concluidas.json" um resumo
-   das obras concluídas (sem valores). O módulo Entrega Técnica lê esse arquivo e cria
+   das obras (sem valores; campo concluida marca as concluídas). O módulo Entrega Técnica lê esse arquivo e cria
    as pendências de entrega técnica. Só grava quando o resumo muda. */
 function etArqObras(){return '/'+SP_BIBLIOTECA+'/Entrega Técnica/_dados/obras_concluidas.json';}
 let _etHash=null,_etTimer=null;
@@ -2366,10 +2366,10 @@ async function exportarObrasEntregas(){
   try{
     if(!msAccount||nivelAcesso()!=='admin')return;
     if(!_carregadoOk.obras||!_carregadoOk.clientes||!_carregadoOk.alocacoes)return;
-    const itens=obras.filter(o=>o.concluida).map(o=>{
+    const itens=obras.map(o=>{
       const c=clientes.find(x=>x.id===o.clienteId)||{};
       const tecs=Array.from(new Set(alocacoes.filter(a=>a.obraId===o.id).map(a=>{const t=tecnicos.find(x=>x.id===a.tecnicoId);return t?t.nome:'';}).filter(Boolean)));
-      return {obraId:o.id,clienteId:o.clienteId||'',cliente:c.nome||'',regional:c.regional||'',obra:o.nome||'',codProjetos:normalizarCodProjetos(o.codProjetos),qtdLances:n(o.qtdLances),qtdBombeamentos:n(o.qtdBombeamentos),dataInicio:o.dataInicio||'',dataConclusao:o.dataConclusao||'',tecnicos:tecs};
+      return {obraId:o.id,clienteId:o.clienteId||'',cliente:c.nome||'',regional:c.regional||'',obra:o.nome||'',codProjetos:normalizarCodProjetos(o.codProjetos),qtdLances:n(o.qtdLances),qtdBombeamentos:n(o.qtdBombeamentos),concluida:!!o.concluida,dataNegociacao:o.dataNegociacao||'',dataEntregaMaterial:o.dataEntregaMaterial||'',dataInicio:o.dataInicio||'',dataConclusao:o.concluida?(o.dataConclusao||''):'',tecnicos:tecs};
     }).sort((a,b)=>String(a.obraId).localeCompare(String(b.obraId)));
     const corpo=JSON.stringify(itens);let h=0;for(let i=0;i<corpo.length;i++)h=(h*31+corpo.charCodeAt(i))|0;
     if(h===_etHash)return;

@@ -283,6 +283,21 @@ body:not(.pode-editar) .so-editor{display:none !important;}
 .req{color:var(--vermelho);}
 .sla-tab td.r b{color:var(--vermelho);}
 .lg .hbar{grid-template-columns:150px minmax(0,1fr) 52px;}
+.obra-pick{position:relative;}
+.obra-pick input[type=search]{width:100%;border:1px solid var(--borda);border-radius:4px;padding:9px 10px;font-size:.9rem;background:#fffdf9;}
+.obra-res{position:absolute;left:0;right:0;top:42px;z-index:5;background:#fff;border:1px solid var(--borda);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:340px;overflow:auto;}
+.obra-res:empty{display:none;}
+.obra-op{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--areia-escura);background:#fff;padding:8px 10px;cursor:pointer;font-family:var(--fonte-corpo);font-size:.84rem;color:var(--texto);}
+.obra-op:hover{background:#f5f1e8;}
+.obra-op small{display:block;color:var(--texto-suave);font-size:.72rem;margin-top:2px;}
+.obra-vazio{padding:10px;font-size:.8rem;color:var(--texto-suave);}
+.obra-card{margin-top:8px;border:1px solid var(--borda);border-left:4px solid var(--ferrugem);border-radius:6px;padding:10px 12px;background:#fffdf7;}
+.obra-card .oc-h{display:flex;align-items:center;gap:8px;}.obra-card .oc-h b{flex:1;}
+.obra-card .oc-o{font-size:.82rem;color:var(--texto-suave);margin:2px 0 8px;}
+.obra-card .oc-g{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;}
+.obra-card .oc-g span{display:block;font-size:.62rem;text-transform:uppercase;letter-spacing:.5px;color:var(--texto-suave);font-weight:700;}
+.obra-card .oc-g b{font-size:.84rem;}
+@media (max-width:700px){.obra-card .oc-g{grid-template-columns:repeat(2,minmax(0,1fr));}}
 </style>
 </head>
 <body>
@@ -608,7 +623,7 @@ let OBRAS=[];let obrasLidoEm=null;
 function obrasLigadas(){const s=new Set();live('entregas').forEach(e=>{if(e.obraId)s.add(e.obraId);});return s;}
 function pendenciasObras(){
   const lig=obrasLigadas();const corte=state.config.corteObras||'';
-  return OBRAS.filter(o=>o&&o.obraId&&!lig.has(o.obraId)&&!getRec('ignoradas',o.obraId)&&(!corte||!o.dataConclusao||o.dataConclusao>=corte))
+  return OBRAS.filter(o=>o&&o.obraId&&o.concluida!==false&&!lig.has(o.obraId)&&!getRec('ignoradas',o.obraId)&&(!corte||!o.dataConclusao||o.dataConclusao>=corte))
     .map(o=>({id:'obra:'+o.obraId,virtual:true,obraId:o.obraId,cliente:o.cliente||'(cliente sem nome)',fazenda:'',obra:o.obra||'',dataConclusaoObra:o.dataConclusao||'',itens:[],itensTxt:[o.qtdLances?o.qtdLances+' lances':'',o.qtdBombeamentos?o.qtdBombeamentos+' bombeamento(s)':''].filter(Boolean).join(' · '),tecnicos:o.tecnicos||[],codProjetos:o.codProjetos||[],regional:o.regional||''}));
 }
 function obraPorId(id){return OBRAS.find(o=>o.obraId===id)||null;}
@@ -877,7 +892,7 @@ function renderParametros(){
   $('pr-email-para').value=c.emailPara||'';$('pr-email-cc').value=c.emailCc||'';$('pr-email-modelo').value=c.emailModelo||'';
   $('pr-corte').value=c.corteObras||'';
   const ign=live('ignoradas').length;
-  $('pr-obras-info').textContent=obrasLidoEm?`${OBRAS.length} obra(s) concluída(s) lidas do módulo Obras (atualizado em ${new Date(obrasLidoEm).toLocaleString('pt-BR')}). ${pendenciasObras().length} viraram pendência; ${ign} ignorada(s).`:'A lista de obras concluídas ainda não foi gravada pelo módulo Obras. Ela é criada quando um admin do Obras abre o módulo.';
+  $('pr-obras-info').textContent=obrasLidoEm?`${OBRAS.filter(o=>o.concluida!==false).length} obra(s) concluída(s) (de ${OBRAS.length}) lidas do módulo Obras (atualizado em ${new Date(obrasLidoEm).toLocaleString('pt-BR')}). ${pendenciasObras().length} viraram pendência; ${ign} ignorada(s).`:'A lista de obras concluídas ainda não foi gravada pelo módulo Obras. Ela é criada quando um admin do Obras abre o módulo.';
   const imp=live('entregas').filter(e=>e.importado).length;
   $('pr-import-info').textContent=imp?`${imp} entrega(s) já importadas da planilha (${SEED.length} linhas). Importar de novo só traz as que faltam.`:`A planilha tem ${SEED.length} entregas (jul/2025 a nov/2026). Elas entram com número, etapa e datas; o que não tiver obra fica como entrega avulsa.`;
 }
@@ -940,8 +955,6 @@ function abrirEntrega(id,preset){
   EDIT={id,e};
   const pode=podeEditar(),dis=!pode;
   const cliList=uniq([...live('entregas').map(x=>x.cliente),...OBRAS.map(o=>o.cliente)]);
-  const obrasOpts=OBRAS.slice().sort((a,b)=>String(b.dataConclusao).localeCompare(String(a.dataConclusao))).map(o=>({v:o.obraId,l:`${o.cliente} — ${o.obra}${o.dataConclusao?' (concluída '+fmtDc(o.dataConclusao)+')':''}`}));
-  if(e.obraId&&!obraPorId(e.obraId))obrasOpts.unshift({v:e.obraId,l:e.obra||'(obra vinculada)'});
   const obra=obraPorId(e.obraId);
   const div=e.divergencia||{ativa:false,motivo:''};
   const corpo=`${passosHtml(e)}
@@ -949,8 +962,8 @@ function abrirEntrega(id,preset){
   <div class="lbl-sec">Cliente</div>
   <div class="grid3">${fld('m-cliente','Cliente <span class="req">*</span>',e.cliente,{list:'dl-cli',dis})}${fld('m-fazenda','Fazenda',e.fazenda,{dis})}${fld('m-consultor','Consultor',null,{type:'select',options:opts(opcoesConsultor(e.consultor),e.consultor,'— escolha —'),dis})}</div>
   <datalist id="dl-cli">${cliList.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
-  <div class="grid" style="margin-top:10px;">${fld('m-obra','Obra da montagem (ligação com o módulo Obras)',null,{type:'select',options:opts(obrasOpts,e.obraId,'— entrega avulsa, sem obra —'),dis,full:true})}</div>
-  ${obra?`<p class="muted" style="margin:6px 0 0;">Obra: ${esc(obra.obra)}${obra.codProjetos&&obra.codProjetos.length?' · projeto '+esc(obra.codProjetos.join(', ')):''}${obra.qtdLances?' · '+obra.qtdLances+' lances':''}${obra.qtdBombeamentos?' · '+obra.qtdBombeamentos+' bombeamento(s)':''}${obra.tecnicos&&obra.tecnicos.length?' · montagem: '+esc(obra.tecnicos.join(', ')):''}${obra.dataConclusao?' · concluída em '+fmtD(obra.dataConclusao):''}</p>`:''}
+  <div class="lbl-sec">Obra da montagem <span class="muted" style="text-transform:none;font-weight:400;">(ligação com o módulo Obras)</span></div>
+  <div class="obra-pick" id="m-obra-pick">${dis?'':`<input type="search" id="m-obra-busca" placeholder="Buscar obra por cliente, obra ou cód. projeto…" autocomplete="off"><div class="obra-res" id="m-obra-res"></div>`}<div id="m-obra-sel"></div></div>
   <div class="lbl-sec">Equipamentos ${e.itensTxt?`<span class="muted" style="text-transform:none;font-weight:400;">(planilha: “${esc(e.itensTxt)}”)</span>`:''}</div>
   <div class="itens-ed" id="m-itens"></div>
   ${pode?'<button class="btn ghost tiny" id="m-add-item" type="button" style="margin-top:6px;">+ equipamento</button>':''}
@@ -974,13 +987,41 @@ function abrirEntrega(id,preset){
     {t:pode?'Cancelar':'Fechar',fn:fecharModal},
     pode?{t:'Salvar',cls:'primary',fn:()=>salvarEntrega()}:null,
   ],()=>{EDIT=null;});
-  renderItensEd();renderAnexosEd();
+  renderItensEd();renderAnexosEd();renderObraSel();
   if(pode){
     $('m-add-item').onclick=()=>{lerItensEd();EDIT.e.itens.push({tipo:(state.config.tipos||[])[0]||'Pivô completo',qtd:1,obs:''});renderItensEd();};
     $('m-div').onchange=ev=>ev.target.closest('.chk').classList.toggle('on',ev.target.checked);
     $('m-anexar').onclick=()=>escolherArquivos($('m-anexo-tipo').value);
-    $('m-obra').onchange=()=>{const o=obraPorId($('m-obra').value);if(o&&!val('m-cliente'))$('m-cliente').value=o.cliente;};
+    const bx=$('m-obra-busca');bx.addEventListener('input',()=>renderObraRes(bx.value));bx.addEventListener('focus',()=>renderObraRes(bx.value));
+    bx.addEventListener('keydown',ev=>{if(ev.key==='Escape'){ev.stopPropagation();$('m-obra-res').innerHTML='';}});
+    document.addEventListener('mousedown',fecharObraRes);
   }
+}
+function obraLinhaInfo(o){return [o.codProjetos&&o.codProjetos.length?'Cód. projeto <b>'+esc(o.codProjetos.join(', '))+'</b>':'sem cód. projeto','Conclusão <b>'+(o.dataConclusao?fmtD(o.dataConclusao):(o.concluida===false?'em andamento':'—'))+'</b>','Negociação <b>'+fmtD(o.dataNegociacao)+'</b>','Entrega de material <b>'+fmtD(o.dataEntregaMaterial)+'</b>'].join(' · ');}
+function renderObraRes(q){
+  const el=$('m-obra-res');if(!el)return;
+  if(!OBRAS.length){el.innerHTML='<div class="obra-vazio">A lista de obras ainda não foi gravada pelo módulo Obras (um admin do Obras precisa abrir o módulo).</div>';return;}
+  const k=chave(q);const lig=obrasLigadas();
+  const L=OBRAS.filter(o=>!k||chave([o.cliente,o.obra,(o.codProjetos||[]).join(' ')].join(' ')).includes(k))
+    .sort((a,b)=>(b.concluida!==false)-(a.concluida!==false)||String(b.dataConclusao||b.dataNegociacao||'').localeCompare(String(a.dataConclusao||a.dataNegociacao||''))).slice(0,40);
+  el.innerHTML=L.map(o=>`<button type="button" class="obra-op" data-ob="${esc(o.obraId)}"><b>${esc(o.cliente)}</b> — ${esc(o.obra)}${lig.has(o.obraId)&&o.obraId!==EDIT.e.obraId?' <span class="bdg etapa">já tem ET</span>':''}${o.concluida===false?' <span class="bdg semprev">em andamento</span>':''}<small>${obraLinhaInfo(o)}</small></button>`).join('')||'<div class="obra-vazio">Nenhuma obra encontrada.</div>';
+  el.querySelectorAll('[data-ob]').forEach(b=>b.onclick=()=>{escolherObra(b.dataset.ob);});
+}
+function fecharObraRes(ev){const p=$('m-obra-pick');if(!p){document.removeEventListener('mousedown',fecharObraRes);return;}if(!p.contains(ev.target)){const r=$('m-obra-res');if(r)r.innerHTML='';}}
+function escolherObra(id){
+  if(!EDIT)return;EDIT.e.obraId=id;const o=obraPorId(id);
+  if(o){EDIT.e.obra=o.obra;if(!val('m-cliente'))$('m-cliente').value=o.cliente;}
+  const r=$('m-obra-res');if(r)r.innerHTML='';const bx=$('m-obra-busca');if(bx)bx.value='';renderObraSel();
+}
+function renderObraSel(){
+  const el=$('m-obra-sel');if(!el||!EDIT)return;const id=EDIT.e.obraId;const o=id?obraPorId(id):null;const pode=podeEditar();
+  if(!id){el.innerHTML='<div class="muted" style="margin-top:6px;">Entrega avulsa, sem obra vinculada.</div>';return;}
+  const x=o||{cliente:EDIT.e.cliente,obra:EDIT.e.obra||'(obra vinculada)',codProjetos:EDIT.e.codProjetos||[],dataConclusao:EDIT.e.dataConclusaoObra};
+  el.innerHTML=`<div class="obra-card"><div class="oc-h"><b>${esc(x.cliente)}</b>${pode?'<button type="button" class="btn ghost tiny" id="m-obra-limpar">Desvincular</button>':''}</div><div class="oc-o">${esc(x.obra)}</div>
+    <div class="oc-g"><div><span>Cliente</span><b>${esc(x.cliente||'—')}</b></div><div><span>Cód. projeto</span><b>${esc((x.codProjetos||[]).join(', ')||'—')}</b></div><div><span>Data da conclusão</span><b>${x.dataConclusao?fmtD(x.dataConclusao):(x.concluida===false?'em andamento':'—')}</b></div><div><span>Data da negociação</span><b>${fmtD(x.dataNegociacao)}</b></div><div><span>Entrega de material</span><b>${fmtD(x.dataEntregaMaterial)}</b></div></div>
+    ${o&&(o.tecnicos&&o.tecnicos.length||o.qtdLances||o.qtdBombeamentos)?`<div class="muted" style="margin-top:6px;">${[o.qtdLances?o.qtdLances+' lances':'',o.qtdBombeamentos?o.qtdBombeamentos+' bombeamento(s)':'',o.tecnicos&&o.tecnicos.length?'montagem: '+o.tecnicos.join(', '):''].filter(Boolean).map(esc).join(' · ')}</div>`:''}
+    ${o?'':'<div class="muted" style="margin-top:6px;">Obra não encontrada na lista atual do módulo Obras.</div>'}</div>`;
+  const lp=$('m-obra-limpar');if(lp)lp.onclick=()=>{EDIT.e.obraId='';EDIT.e.obra='';renderObraSel();};
 }
 function sugerirTipoAnexo(e){const et=etapa(e);if(et==='andamento'||et==='pendente')return 'termo';if(et==='envio'||et==='fabrica')return 'fabrica';if(et==='pagamento')return 'pagamento';return 'outro';}
 function novaDeObra(v){
@@ -1002,7 +1043,7 @@ function renderAnexosEd(){
 function lerForm(e){
   lerItensEd();
   e.cliente=val('m-cliente');e.fazenda=val('m-fazenda');e.consultor=$('m-consultor').value;e.consultorEmail=emailDoConsultor(e.consultor)||(e.consultor===EDIT.e.consultor?EDIT.e.consultorEmail||'':'');
-  const ob=$('m-obra').value;if(ob!==(e.obraId||'')){e.obraId=ob;const o=obraPorId(ob);e.obra=o?o.obra:'';e.dataConclusaoObra=o?o.dataConclusao||'':'';}
+  const ob=EDIT.e.obraId||'';if(ob!==(e.obraId||'')||ob){const o=obraPorId(ob);e.obraId=ob;if(o||!ob){e.obra=o?o.obra:'';e.dataConclusaoObra=o?o.dataConclusao||'':'';e.codProjetos=o?o.codProjetos||[]:[];}}
   e.itens=(EDIT.e.itens||[]).filter(i=>i.tipo&&(nNum(i.qtd)>0||i.obs));
   e.inicio=$('m-inicio').value;e.termino=$('m-termino').value;e.emailFabrica=$('m-email').value;e.aprovacao=$('m-aprovacao').value;e.pagamento=$('m-pagamento').value;
   e.valor=val('m-valor');e.nf=val('m-nf');e.obs=$('m-obs').value.trim();
