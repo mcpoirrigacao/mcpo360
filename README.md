@@ -12,7 +12,7 @@ Endereço: https://mcpoirrigacao.github.io/mcpo360/
 | `redirect.html` | Não usado (o login volta para `/mcpo360/`) |
 | `modulos/<id>/index.html` | Cada app antigo, adaptado para rodar dentro do MCPO 360 |
 
-Módulos: `painel`, `assistencia`, `pecas`, `compras`, `obras`, `orcamento`, `crmsam`, `crmcomercial`, `followup`, `treinamentos`.
+Módulos: `painel`, `assistencia`, `pecas`, `compras`, `orcamento`, `obras`, `entregas`, `crmsam`, `crmcomercial`, `followup`, `treinamentos`.
 
 ## Acessos
 
@@ -31,3 +31,13 @@ Cada pessoa grava um contador por módulo/dia em `MCPO360/uso/<email>.json`. A t
 
 No registro **MCPO API Github** › Autenticação › Aplicativo de página única, cadastrar:
 `https://mcpoirrigacao.github.io/mcpo360/` (já cadastrado)
+
+## Entrega Técnica (`entregas`)
+
+- Pasta no SharePoint: `Documentos Compartilhados › Entrega Técnica` (criada pela sincronização da Central, se não existir).
+  - `_dados/entregas_dados.json`: entregas, parâmetros e pastas dos clientes (gravação com ETag e mesclagem por registro).
+  - `_dados/obras_concluidas.json`: gravado pelo módulo Obras (admin) com as obras concluídas, sem valores. Obra concluída a partir da data de corte (Parâmetros) vira "Pendente ET".
+  - `Clientes/<cliente>/<ET-AAAA-NNN - equipamentos - fazenda>/`: anexos enviados pelo módulo (termo, fotos, aprovação da fábrica, comprovante).
+- Níveis: Admin (tudo + Parâmetros), Consultor (cria/atualiza entregas e anexos), Comum (só visualiza). Funções do Azure: `Entregas.Admin`, `Entregas.Consultor`, `Entregas.Comum`.
+- Admins do Obras recebem escrita na pasta da Entrega Técnica (para gravar `obras_concluidas.json`).
+- Etapas: Pendente ET → Em andamento → Enviar à fábrica → Aguardando fábrica → Aguardando pagamento → Paga; divergência é uma marca na entrega.

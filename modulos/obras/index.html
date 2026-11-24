@@ -2355,7 +2355,31 @@ document.getElementById('btn-excluir-registro').addEventListener('click',async()
 });
 
 /* ============================ RENDER GERAL / ABAS ============================ */
+/* ==================== ENTREGA TÉCNICA: obras concluídas ====================
+   O admin do Obras grava em "Entrega Técnica/_dados/obras_concluidas.json" um resumo
+   das obras concluídas (sem valores). O módulo Entrega Técnica lê esse arquivo e cria
+   as pendências de entrega técnica. Só grava quando o resumo muda. */
+function etArqObras(){return '/'+SP_BIBLIOTECA+'/Entrega Técnica/_dados/obras_concluidas.json';}
+let _etHash=null,_etTimer=null;
+function agendarExportEntregas(){clearTimeout(_etTimer);_etTimer=setTimeout(exportarObrasEntregas,3000);}
+async function exportarObrasEntregas(){
+  try{
+    if(!msAccount||nivelAcesso()!=='admin')return;
+    if(!_carregadoOk.obras||!_carregadoOk.clientes||!_carregadoOk.alocacoes)return;
+    const itens=obras.filter(o=>o.concluida).map(o=>{
+      const c=clientes.find(x=>x.id===o.clienteId)||{};
+      const tecs=Array.from(new Set(alocacoes.filter(a=>a.obraId===o.id).map(a=>{const t=tecnicos.find(x=>x.id===a.tecnicoId);return t?t.nome:'';}).filter(Boolean)));
+      return {obraId:o.id,clienteId:o.clienteId||'',cliente:c.nome||'',regional:c.regional||'',obra:o.nome||'',codProjetos:normalizarCodProjetos(o.codProjetos),qtdLances:n(o.qtdLances),qtdBombeamentos:n(o.qtdBombeamentos),dataInicio:o.dataInicio||'',dataConclusao:o.dataConclusao||'',tecnicos:tecs};
+    }).sort((a,b)=>String(a.obraId).localeCompare(String(b.obraId)));
+    const corpo=JSON.stringify(itens);let h=0;for(let i=0;i<corpo.length;i++)h=(h*31+corpo.charCodeAt(i))|0;
+    if(h===_etHash)return;
+    const t=await getGraphToken(),base=await spDriveUrl(etArqObras());if(!t||!base)return;
+    const r=await fetch(base+':/content',{method:'PUT',headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:JSON.stringify({versao:1,geradoEm:new Date().toISOString(),geradoPor:emailAtual(),itens})});
+    if(r.ok)_etHash=h;else console.warn('Entrega Técnica: não gravou obras concluídas (HTTP '+r.status+')');
+  }catch(e){console.warn('Entrega Técnica:',e&&e.message);}
+}
 function renderAll(){
+  agendarExportEntregas();
   renderPainel();
   renderRegional();
   if(document.getElementById('pane-clientes').classList.contains('active')){renderFiltrosClientes();renderClientes();}

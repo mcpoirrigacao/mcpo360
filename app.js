@@ -25,7 +25,7 @@ const GRAPH = 'https://graph.microsoft.com/v1.0';
 const BASE = typeof location !== 'undefined' ? location.origin + location.pathname.replace(/[^/]*$/, '') : '';
 const REDIRECT = BASE;   // https://mcpoirrigacao.github.io/mcpo360/ (cadastrado no Azure)
 const REG = '_mcpo_permissoes.json';
-const VERSAO = '202611240841';   // muda a cada publicação: força o navegador a buscar os módulos novos
+const VERSAO = '202611241200';   // muda a cada publicação: força o navegador a buscar os módulos novos
 
 /* ---------------- módulos ----------------
    niveis: do mais alto para o mais baixo.
@@ -46,13 +46,16 @@ const MODULOS = [
   { id: 'compras', dir: 'compras', sigla: 'CE', curto: 'Compras', nome: 'Compras e estoque', grupo: 'Operação', desc: 'BI de compras e estoque de peças',
     niveis: ['admin', 'comum'], pasta: { caminhos: ['Compras-estoque'] }, papel: n => n === 'admin' ? 'write' : 'read',
     acesso: [['Compras-estoque', 'compras_pecas_acesso.json']] },
-  { id: 'obras', dir: 'obras', sigla: 'OB', curto: 'Obras', nome: 'Obras de montagem', grupo: 'Operação', desc: 'Clientes, obras, lançamentos e agenda',
-    niveis: ['admin', 'comum', 'agenda'], rotulos: { agenda: 'Só agenda' }, pasta: { caminhos: ['Execução de Montagem'] },
-    papel: n => n === 'admin' ? 'write' : 'read', le: n => n === 'admin' ? ['orcamento'] : [],
-    acesso: [['Execução de Montagem', 'mcpo_acesso.json']] },
   { id: 'orcamento', dir: 'orcamento', sigla: 'OR', curto: 'Orçam.', nome: 'Orçamentação', grupo: 'Operação', desc: 'Orçamento de montagem de pivôs',
     niveis: ['admin', 'gestor', 'comum'], pasta: { caminhos: ['Orçamentos Montagem/Historico_montagem'] }, papel: () => 'write',
     acesso: [['Orçamentos Montagem/Historico_montagem', 'parametros.json']] },
+  { id: 'obras', dir: 'obras', sigla: 'OB', curto: 'Obras', nome: 'Obras de montagem', grupo: 'Operação', desc: 'Clientes, obras, lançamentos e agenda',
+    niveis: ['admin', 'comum', 'agenda'], rotulos: { agenda: 'Só agenda' }, pasta: { caminhos: ['Execução de Montagem'] },
+    papel: n => n === 'admin' ? 'write' : 'read', le: n => n === 'admin' ? ['orcamento'] : [], escreve: n => n === 'admin' ? ['entregas'] : [],
+    acesso: [['Execução de Montagem', 'mcpo_acesso.json']] },
+  { id: 'entregas', dir: 'entregas', sigla: 'ET', curto: 'Entrega', nome: 'Entrega Técnica', grupo: 'Operação', desc: 'Entregas técnicas, aprovação da fábrica e pagamento',
+    niveis: ['admin', 'consultor', 'comum'], rotulos: { consultor: 'Consultor' }, pasta: { caminhos: ['Entrega Técnica'], criar: true },
+    papel: n => n === 'comum' ? 'read' : 'write' },
   { id: 'crmsam', dir: 'crmsam', sigla: 'CS', curto: 'CRM SAM', nome: 'CRM SAM', grupo: 'Comercial e pessoas', desc: 'Funil de Grandes Contas',
     niveis: ['admin', 'editor', 'comum'], rotulos: { editor: 'Editor (só os seus)' }, pasta: { link: LINK_CRMSAM, caminhos: ['CRM SAM'] },
     papel: n => n === 'comum' ? 'read' : 'write', acesso: [['@crmsam', 'crm_sam_acesso.json']] },
@@ -68,7 +71,7 @@ const MODULOS = [
 ];
 const CENTRAL = { id: 'central', nome: 'Central de acessos', curto: 'Central', niveis: ['admin'] };
 const MOD = Object.fromEntries(MODULOS.map(m => [m.id, m]));
-const ROTULO = { admin: 'Admin', comum: 'Comum', gestor: 'Gestor', editor: 'Editor', visualizador: 'Visualizador', equipe: 'Equipe', agenda: 'Só agenda', acesso: 'Acesso' };
+const ROTULO = { admin: 'Admin', consultor: 'Consultor', comum: 'Comum', gestor: 'Gestor', editor: 'Editor', visualizador: 'Visualizador', equipe: 'Equipe', agenda: 'Só agenda', acesso: 'Acesso' };
 const rotulo = (m, n) => (m.rotulos && m.rotulos[n]) || ROTULO[n] || n;
 
 /* Funções do app no Azure → nível. MCPO.Admin = admin em tudo e na Central. */
@@ -80,6 +83,7 @@ const FUNCOES = {
   'Followup.Admin': ['followup', 'admin'], 'Followup.Leitor': ['followup', 'visualizador'],
   'Treinamentos.Admin': ['treinamentos', 'admin'], 'Treinamentos.Comum': ['treinamentos', 'comum'],
   'Obras.Admin': ['obras', 'admin'], 'Obras.Comum': ['obras', 'comum'],
+  'Entregas.Admin': ['entregas', 'admin'], 'Entregas.Consultor': ['entregas', 'consultor'], 'Entregas.Comum': ['entregas', 'comum'],
   'Orcamento.Admin': ['orcamento', 'admin'], 'Orcamento.Gestor': ['orcamento', 'gestor'], 'Orcamento.Comum': ['orcamento', 'comum'],
   'CRMSAM.Admin': ['crmsam', 'admin'], 'CRMSAM.Editor': ['crmsam', 'editor'], 'CRMSAM.Comum': ['crmsam', 'comum'],
 };
@@ -124,6 +128,7 @@ function calcularDesejado(acessos) {
       if (id === 'crmcomercial') por('crmcfg', email, 'read');
       if (m.pasta && m.papel) por(id, email, m.papel(nivel));
       if (m.le) for (const outro of m.le(nivel)) if (MOD[outro] && MOD[outro].pasta) por(outro, email, 'read');
+      if (m.escreve) for (const outro of m.escreve(nivel)) if (MOD[outro] && MOD[outro].pasta) por(outro, email, 'write');
     }
     if (algum) { por('mcpo360', email, 'read'); por('uso', email, 'write'); }
   }
@@ -217,6 +222,7 @@ async function urlPasta(chave) {
     if (!url && p) for (const c of p.caminhos || []) {
       const u = await urlCaminho(c); const r = await g(u); if (r.ok) { url = u; break; }
     }
+    if (!url && p && p.criar && p.caminhos && p.caminhos[0]) { try { url = await garantirPasta(p.caminhos[0]); } catch (e) { url = null; } }
   }
   _pastaCache[chave] = url; return url;
 }
