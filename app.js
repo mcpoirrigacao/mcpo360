@@ -25,7 +25,7 @@ const GRAPH = 'https://graph.microsoft.com/v1.0';
 const BASE = typeof location !== 'undefined' ? location.origin + location.pathname.replace(/[^/]*$/, '') : '';
 const REDIRECT = BASE;   // https://mcpoirrigacao.github.io/mcpo360/ (cadastrado no Azure)
 const REG = '_mcpo_permissoes.json';
-const VERSAO = '202611241200';   // muda a cada publicação: força o navegador a buscar os módulos novos
+const VERSAO = '202611241600';   // muda a cada publicação: força o navegador a buscar os módulos novos
 
 /* ---------------- módulos ----------------
    niveis: do mais alto para o mais baixo.
@@ -616,6 +616,8 @@ window.MCPO360 = {
   versao: 1,
   nivel: id => NIVEIS[id] || null,
   email: () => emailAtual(),
+  /* Entrega Técnica: e-mails liberados num módulo na Central ([{ email, nivel }]); null se a Central não pôde ser lida */
+  usuarios: mod => { if (!ACESSOS || !ACESSOS.usuarios || !MOD[mod]) return null; return Object.entries(ACESSOS.usuarios).filter(([, u]) => u && u.modulos && u.modulos[mod]).map(([email, u]) => ({ email, nivel: u.modulos[mod] })); },
   abrir: id => { location.hash = '#' + id; },
   /* CRM Comercial: senha da planilha guardada no SharePoint (só quem tem o módulo lê) */
   senhaCrm: async () => { if (!NIVEIS.crmcomercial) return ''; try { const r = await lerJson(await urlCaminho(CFG.pastaCrm + '/crm_config.json')); return (r.ok && r.data && r.data.senhaPlanilha) || ''; } catch (e) { return ''; } },

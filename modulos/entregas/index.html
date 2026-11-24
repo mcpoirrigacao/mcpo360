@@ -402,7 +402,7 @@ body:not(.pode-editar) .so-editor{display:none !important;}
     <p class="pane-desc">Só administradores. As alterações valem para todos.</p>
     <div class="cols2">
       <div class="card"><h3>Consultores</h3>
-        <div class="field"><label for="pr-consultores">Um por linha: Nome; Cargo; e-mail (cargo e e-mail opcionais)</label><textarea id="pr-consultores" rows="6"></textarea></div>
+        <p class="muted" style="margin:0 0 8px;">Vêm da <b>Central de acessos</b>: e-mails liberados na Entrega Técnica como Admin ou Consultor. O nome é o que vem antes do @ (ex.: lucas.xavier@… → Lucas Xavier).</p><div id="pr-consultores-lista"></div>
         <div class="field" style="margin-top:10px;"><label for="pr-tipos">Tipos de equipamento (um por linha)</label><textarea id="pr-tipos" rows="7"></textarea></div>
       </div>
       <div class="card"><h3>Prazos de cada etapa (dias)</h3>
@@ -590,7 +590,16 @@ function proximoNumero(ano){
   live('entregas').forEach(e=>{const m=re.exec(e.numero||'');if(m)mx=Math.max(mx,+m[1]);});
   return 'ET-'+ano+'-'+String(mx+1).padStart(3,'0');
 }
-function consultores(){return (state.config.consultores||[]).map(c=>c.nome).filter(Boolean);}
+/* consultores = e-mails liberados na Entrega Técnica (Admin/Consultor) na Central de acessos;
+   o nome é a parte antes do @ (lucas.xavier@… → Lucas Xavier). Se o nome já existe nas
+   entregas com acento (Rejane Falcão), usa essa grafia. */
+function nomeDoEmail(email){const min=['da','de','do','das','dos','e'];return String(email||'').split('@')[0].replace(/[._-]+/g,' ').trim().split(/\s+/).map((w,i)=>i&&min.includes(w.toLowerCase())?w.toLowerCase():w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' ');}
+function consultoresCentral(){const s=_mcpo360();if(!s||typeof s.usuarios!=='function')return null;let L;try{L=s.usuarios(MCPO360_MODULO);}catch(e){return null;}if(!Array.isArray(L))return null;
+  const usados=live('entregas').map(e=>e.consultor).filter(Boolean);
+  return L.filter(u=>u&&u.email&&(u.nivel==='consultor'||u.nivel==='admin')).map(u=>{const nm=nomeDoEmail(u.email);const igual=usados.find(x=>chave(x)===chave(nm));return {email:String(u.email).toLowerCase(),nome:igual||nm,nivel:u.nivel};}).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));}
+function consultores(){const c=consultoresCentral();if(c)return c.map(x=>x.nome);return (state.config.consultores||[]).map(c=>c.nome).filter(Boolean);}
+function emailDoConsultor(nome){const c=consultoresCentral();const x=c&&c.find(y=>y.nome===nome);return x?x.email:'';}
+function opcoesConsultor(atual){const L=consultores();if(atual&&!L.includes(atual))L.push(atual);return L;}
 function listaConsultores(){return uniq([...consultores(),...live('entregas').map(e=>e.consultor)]);}
 function addHist(e,txt){e.historico=Array.isArray(e.historico)?e.historico:[];e.historico.unshift({em:new Date().toISOString(),por:emailAtual()||'local',txt});if(e.historico.length>60)e.historico.length=60;}
 
@@ -860,7 +869,8 @@ function renderPrazos(){
 function renderParametros(){
   const c=state.config;
   if(document.activeElement&&document.activeElement.closest&&document.activeElement.closest('#pane-parametros'))return;
-  $('pr-consultores').value=(c.consultores||[]).map(x=>[x.nome,x.cargo,x.email].filter((v,i)=>i===0||v).join('; ')).join('\n');
+  const cc=consultoresCentral();
+  $('pr-consultores-lista').innerHTML=cc==null?'<div class="note warn" style="margin:0;">Não foi possível ler a Central de acessos (abra pelo MCPO 360). Enquanto isso, a lista usa os nomes das entregas.</div>':cc.length?`<table class="dt"><thead><tr><th>Consultor</th><th>E-mail</th><th>Nível</th></tr></thead><tbody>${cc.map(x=>`<tr><td><b>${esc(x.nome)}</b></td><td>${esc(x.email)}</td><td>${x.nivel==='admin'?'Admin':'Consultor'}</td></tr>`).join('')}</tbody></table>`:'<div class="note warn" style="margin:0;">Nenhum e-mail liberado como Admin ou Consultor da Entrega Técnica na Central de acessos.</div>';
   $('pr-tipos').value=(c.tipos||[]).join('\n');
   $('pr-prazos').innerHTML=ETAPAS.filter(e=>e.id!=='paga').map(e=>`<div class="field"><label for="pr-pz-${e.id}">${esc(e.nome)}</label><input id="pr-pz-${e.id}" type="number" min="0" value="${esc(c.prazos[e.id])}"></div>`).join('');
   $('pr-atencao').value=c.atencaoPct;
@@ -873,10 +883,9 @@ function renderParametros(){
 }
 $('pr-salvar').onclick=()=>{
   if(!ehAdmin())return;
-  const cons=$('pr-consultores').value.split('\n').map(l=>l.split(';').map(s=>s.trim())).filter(p=>p[0]).map(p=>({nome:p[0],cargo:p[1]||'',email:(p[2]||'').toLowerCase()}));
   const tipos=uniq($('pr-tipos').value.split('\n').map(normTxt));
   const pz={};ETAPAS.filter(e=>e.id!=='paga').forEach(e=>pz[e.id]=Math.max(0,Math.round(n($('pr-pz-'+e.id).value))));
-  setConfig('consultores',cons);setConfig('tipos',tipos.length?tipos:CONFIG_DEFAULT.tipos);setConfig('prazos',pz);
+  setConfig('tipos',tipos.length?tipos:CONFIG_DEFAULT.tipos);setConfig('prazos',pz);
   setConfig('atencaoPct',Math.min(100,Math.max(10,Math.round(n($('pr-atencao').value)||75))));
   setConfig('emailPara',normTxt($('pr-email-para').value));setConfig('emailCc',normTxt($('pr-email-cc').value));setConfig('emailModelo',$('pr-email-modelo').value);
   setConfig('corteObras',$('pr-corte').value||'');
@@ -938,7 +947,7 @@ function abrirEntrega(id,preset){
   const corpo=`${passosHtml(e)}
   ${e.importado?'<div class="note">Entrega importada da planilha antiga — confira os equipamentos.</div>':''}
   <div class="lbl-sec">Cliente</div>
-  <div class="grid3">${fld('m-cliente','Cliente <span class="req">*</span>',e.cliente,{list:'dl-cli',dis})}${fld('m-fazenda','Fazenda',e.fazenda,{dis})}${fld('m-consultor','Consultor',null,{type:'select',options:opts(listaConsultores(),e.consultor,'— escolha —'),dis})}</div>
+  <div class="grid3">${fld('m-cliente','Cliente <span class="req">*</span>',e.cliente,{list:'dl-cli',dis})}${fld('m-fazenda','Fazenda',e.fazenda,{dis})}${fld('m-consultor','Consultor',null,{type:'select',options:opts(opcoesConsultor(e.consultor),e.consultor,'— escolha —'),dis})}</div>
   <datalist id="dl-cli">${cliList.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
   <div class="grid" style="margin-top:10px;">${fld('m-obra','Obra da montagem (ligação com o módulo Obras)',null,{type:'select',options:opts(obrasOpts,e.obraId,'— entrega avulsa, sem obra —'),dis,full:true})}</div>
   ${obra?`<p class="muted" style="margin:6px 0 0;">Obra: ${esc(obra.obra)}${obra.codProjetos&&obra.codProjetos.length?' · projeto '+esc(obra.codProjetos.join(', ')):''}${obra.qtdLances?' · '+obra.qtdLances+' lances':''}${obra.qtdBombeamentos?' · '+obra.qtdBombeamentos+' bombeamento(s)':''}${obra.tecnicos&&obra.tecnicos.length?' · montagem: '+esc(obra.tecnicos.join(', ')):''}${obra.dataConclusao?' · concluída em '+fmtD(obra.dataConclusao):''}</p>`:''}
@@ -992,7 +1001,7 @@ function renderAnexosEd(){
 }
 function lerForm(e){
   lerItensEd();
-  e.cliente=val('m-cliente');e.fazenda=val('m-fazenda');e.consultor=$('m-consultor').value;
+  e.cliente=val('m-cliente');e.fazenda=val('m-fazenda');e.consultor=$('m-consultor').value;e.consultorEmail=emailDoConsultor(e.consultor)||(e.consultor===EDIT.e.consultor?EDIT.e.consultorEmail||'':'');
   const ob=$('m-obra').value;if(ob!==(e.obraId||'')){e.obraId=ob;const o=obraPorId(ob);e.obra=o?o.obra:'';e.dataConclusaoObra=o?o.dataConclusao||'':'';}
   e.itens=(EDIT.e.itens||[]).filter(i=>i.tipo&&(nNum(i.qtd)>0||i.obs));
   e.inicio=$('m-inicio').value;e.termino=$('m-termino').value;e.emailFabrica=$('m-email').value;e.aprovacao=$('m-aprovacao').value;e.pagamento=$('m-pagamento').value;
@@ -1037,8 +1046,8 @@ function acaoEtapa(id){
   let corpo='',aplicar=null,tipoAnx=null;
   const cab=`<p style="margin:0 0 12px;"><b>${esc(e.numero||'')} · ${esc(rotuloCliente(e))}</b><br><span class="muted">${esc(itensResumo(e))}</span></p>`;
   if(et==='pendente'){
-    corpo=cab+`<div class="grid">${fld('a-consultor','Consultor',null,{type:'select',options:opts(listaConsultores(),e.consultor,'— escolha —')})}${fld('a-data','Data de início',e.inicio||hoje,{type:'date'})}</div>`;
-    aplicar=x=>{const c=$('a-consultor').value;if(!c)return 'Escolha o consultor.';x.consultor=c;x.inicio=$('a-data').value;if(!x.inicio)return 'Informe a data de início.';};
+    corpo=cab+`<div class="grid">${fld('a-consultor','Consultor',null,{type:'select',options:opts(opcoesConsultor(e.consultor),e.consultor,'— escolha —')})}${fld('a-data','Data de início',e.inicio||hoje,{type:'date'})}</div>`;
+    aplicar=x=>{const c=$('a-consultor').value;if(!c)return 'Escolha o consultor.';x.consultor=c;x.consultorEmail=emailDoConsultor(c)||x.consultorEmail||'';x.inicio=$('a-data').value;if(!x.inicio)return 'Informe a data de início.';};
   }else if(et==='andamento'){
     const temTermo=(e.anexos||[]).some(a=>a.tipo==='termo');
     corpo=cab+`<div class="grid">${fld('a-data','Término em campo',hoje,{type:'date'})}</div>${temTermo?'<p class="muted">Termo de ET já anexado.</p>':'<div class="note warn">Anexe o termo de entrega técnica assinado.</div>'}<div style="margin-top:8px;"><label class="muted">Termo / fotos: <input type="file" id="a-arq" multiple></label></div>`;
