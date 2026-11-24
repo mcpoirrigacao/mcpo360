@@ -1117,6 +1117,7 @@ function abrirEntrega(id,preset){
   modal(titulo,corpo,[
     id&&ehAdmin()?{t:'Excluir',cls:'danger',left:true,fn:()=>excluirEntrega(id)}:null,
     {t:pode?'Cancelar':'Fechar',fn:fecharModal},
+    id&&pode&&etapa(e)!=='pendente'?{t:'← Voltar etapa',fn:()=>voltarEtapa(id)}:null,
     id&&pode&&ETAPA[etapa(e)].acao?{t:ETAPA[etapa(e)].acao+' →',fn:()=>{fecharModal();acaoEtapa(id);}}:null,
     pode?{t:'Salvar',cls:'primary',fn:()=>salvarEntrega()}:null,
   ],()=>{EDIT=null;});
@@ -1225,6 +1226,20 @@ function salvarEntrega(silencioso){
 function excluirEntrega(id){const e=getRec('entregas',id);if(!e)return;if(!confirm(`Excluir a entrega ${e.numero||''} de ${e.cliente}?\nOs anexos continuam na pasta do SharePoint.`))return;delRec('entregas',id);save();fecharModal();renderAll();toast('Entrega excluída.');}
 function ignorarObra(obraId){if(!ehAdmin())return;const o=obraPorId(obraId);if(!confirm(`Esta obra não precisa de entrega técnica?\n\n${o?o.cliente+' — '+o.obra:obraId}\n\nEla sai de “Pendente ET” (dá para voltar em Parâmetros).`))return;putRec('ignoradas',obraId,{em:hojeISO(),cliente:o?o.cliente:'',obra:o?o.obra:''});save();renderAll();}
 
+/* ---------------- voltar etapa: apaga a data que levou a entrega para a etapa atual ---------------- */
+const CAMPO_ETAPA={andamento:['inicio','Início da ET'],envio:['termino','Término em campo'],fabrica:['emailFabrica','E-mail à fábrica'],pagamento:['aprovacao','Aprovação da fábrica'],paga:['pagamento','Pagamento']};
+function voltarEtapa(id){
+  if(!podeEditar())return;const e=getRec('entregas',id);if(!e)return;const et=etapa(e);const c=CAMPO_ETAPA[et];if(!c)return;
+  const ant=ETAPAS[ETAPA[et].i-1];
+  modal('Voltar etapa',`<p style="margin:0 0 10px;"><b>${esc(e.numero||'')} · ${esc(rotuloCliente(e))}</b></p>
+    <p>A entrega volta de <b>${esc(ETAPA[et].nome)}</b> para <b>${esc(ant.nome)}</b>. A data “${esc(c[1])}” (${fmtD(e[c[0]])}) será apagada; os anexos continuam.</p>
+    <div class="grid">${fld('v-motivo','Motivo (opcional)','',{full:true,ph:'ex.: lançado por engano, fábrica pediu correção'})}</div>`,[
+    {t:'Cancelar',fn:()=>{fecharModal();abrirEntrega(id);}},
+    {t:'← Voltar para '+ant.nome,cls:'primary',fn:()=>{
+      const x=clone(getRec('entregas',id));const antes=x[c[0]];x[c[0]]='';if(et==='pagamento')delete x.aprovada;
+      const mot=val('v-motivo');addHist(x,`Voltou etapa: ${ETAPA[et].nome} → ${ETAPA[etapa(x)].nome} (apagada ${c[1]} ${fmtD(antes)})${mot?' — '+mot:''}`);
+      putRec('entregas',id,x);save();fecharModal();renderAll();toast(`${x.numero||'Entrega'}: voltou para ${ETAPA[etapa(x)].nome}`);abrirEntrega(id);}}]);
+}
 /* ---------------- ações de etapa (botão do card) ---------------- */
 function acaoEtapa(id){
   if(!podeEditar())return;
