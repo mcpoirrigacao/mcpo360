@@ -532,7 +532,7 @@ const ETAPAS=[
 const ETAPA=Object.fromEntries(ETAPAS.map((e,i)=>[e.id,Object.assign({i},e)]));
 const ABERTAS=['pendente','andamento','envio','fabrica','pagamento'];
 const PRAZO_INFO={atrasada:'Atrasada',atencao:'Atenção',noprazo:'No prazo',semprev:'Sem previsão',concluida:'Concluída',agendada:'Agendada'};
-const TIPOS_ANEXO=[{v:'termo',l:'Termo de ET assinado'},{v:'fotos',l:'Fotos'},{v:'fabrica',l:'E-mail / aprovação da fábrica'},{v:'pagamento',l:'Comprovante / NF'},{v:'outro',l:'Outro'}];
+const TIPOS_ANEXO=[{v:'termo',l:'Termo de ET assinado'},{v:'garantia',l:'Termo de garantia'},{v:'fotos',l:'Fotos'},{v:'fabrica',l:'E-mail / aprovação da fábrica'},{v:'pagamento',l:'Comprovante / NF'},{v:'outro',l:'Outro'}];
 const TIPO_ANEXO=Object.fromEntries(TIPOS_ANEXO.map(t=>[t.v,t.l]));
 
 const CONFIG_DEFAULT={
@@ -1320,7 +1320,7 @@ async function enviarArquivos(id,arqs,tipo){
     info('📁 preparando a pasta…');const pasta=await pastaDaEntrega(id);
     const novos=[];
     for(let i=0;i<arqs.length;i++){const a=arqs[i];info(`⬆ enviando ${i+1}/${arqs.length}…`);
-      const nome=nomePasta((TIPO_ANEXO[tipo]||'Anexo').split(' ')[0]+' - '+a.name.replace(/\.[^.]+$/,''))+(/\.[^.]+$/.exec(a.name)||[''])[0];
+      const nome=nomePasta(({termo:'Termo ET',garantia:'Termo de garantia',fotos:'Foto',fabrica:'Fábrica',pagamento:'Comprovante'}[tipo]||'Anexo')+' - '+a.name.replace(/\.[^.]+$/,''))+(/\.[^.]+$/.exec(a.name)||[''])[0];
       const it=await subirArquivo(pasta,a,nome);if(it)novos.push({id:it.id,nome:it.name,tipo,webUrl:it.webUrl,tamanho:it.size||a.size,em:new Date().toISOString(),por:emailAtual()});}
     const x=clone(getRec('entregas',id));x.anexos=[...(x.anexos||[]),...novos];x.pasta=pasta;addHist(x,`${novos.length} anexo(s): ${TIPO_ANEXO[tipo]||tipo}`);putRec('entregas',id,x);save();
     if(EDIT&&EDIT.id===id){EDIT.e.anexos=x.anexos;EDIT.e.pasta=pasta;renderAnexosEd();}
