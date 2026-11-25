@@ -32,6 +32,12 @@ header.app-header .sync-status{display:inline-block}
 header.app-header .mod-switch{order:0;margin:3px 0!important;padding:2px!important;gap:2px!important}
 header.app-header .mod-switch button{padding:3px 9px!important;font-size:12px!important;line-height:1.3!important}
 </style>
+<style id="followup-linhas-extras">
+tr.sub td{background:#fbf9f4}
+tr.sub td.sub-nome{padding-left:22px;font-size:.92em;opacity:.85}
+tr.sub-add td{padding:2px 8px 8px!important}
+tr.sub-add .btn{font-size:12px;padding:3px 10px}
+</style>
 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -644,6 +650,8 @@ function cmpRegional(a,b){const ra=rankRegional(a.regional),rb=rankRegional(b.re
   if(ra===9) return 0; const d=norm(a.regional).localeCompare(norm(b.regional)); return d||String(a.nome).localeCompare(String(b.nome),'pt-BR');}
 /* ---- linhas a partir do e-mail de quem preenche: alana.xavier@... -> "alana.xavier" ---- */
 function porEmail(eq){return eq.tipo==='manual'&&eq.linhasPorEmail!==false;}
+/* equipes com linhas por e-mail: a coluna da pessoa chama "Nome" */
+function rotuloLinhaTxt(eq){return porEmail(eq)?'Nome':(eq.rotuloLinha||'Linha');}
 /* extrai só o e-mail do que foi digitado/colado (tira ícones, nomes, espaços, <>, ;) e completa @mcpoirrigacao.com → .com.br */
 function limparEmail(x){const m=String(x||'').toLowerCase().match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/);let e=m?m[0]:'';if(/@mcpoirrigacao\.com$/.test(e))e+='.br';return e;}
 function nomeDoEmail(em){return String(em||'').split('@')[0].trim().toLowerCase();}
@@ -680,7 +688,15 @@ function regIdx(){ const ks=Object.keys(state.registros); const st=stateGen+'|'+
   _idx={}; ks.forEach(k=>{const r=state.registros[k]; (_idx[r.e+'|'+r.s]=_idx[r.e+'|'+r.s]||[]).push(r);}); _idxStamp=st; return _idx; }
 function regionaisEquipe(eq){ return Array.from(new Set(eq.linhas.map(l=>(l.regional||'').trim()).filter(Boolean))).sort(); }
 function rec(s,eqId,lId,g){return state.registros[rkey(s,eqId,lId,g)];}
-function valorArmazenado(s,eq,lId,g,c){const r=rec(s,eq.id,lId,g);return r&&r.v?r.v[c.id]:undefined;}
+function valorArmazenado(s,eq,lId,g,c){const r=rec(s,eq.id,lId,g); if(!r||!r.v) return undefined; const base=r.v[c.id];
+  if(!isNum(c)) return base;
+  /* linhas extras da pessoa (campo#2, campo#3…) entram no total da linha */
+  const ex=Object.keys(r.v).filter(k=>k.indexOf(c.id+'#')===0).map(k=>r.v[k]);
+  if(!ex.some(temValor)) return base;
+  return agregar([base,...ex], c.agreg==='media'?'media':c.agreg==='maximo'?'maximo':'soma');}
+/* quantas linhas extras um registro tem (campos "id#N", N>=2) + as criadas agora na tela */
+const SUBLOCAL={};
+function nSub(k){ const r=state.registros[k]; let m=1; if(r&&r.v) Object.keys(r.v).forEach(x=>{const mm=x.match(/#(\d+)$/); if(mm) m=Math.max(m,+mm[1]);}); return Math.max(m,SUBLOCAL[k]||1)-1; }
 /* valor efetivo: campo automático usa o app de origem quando há dado; senão o histórico gravado */
 /* campo lançado só no 1º bloco (ex.: Pivô: KM RODADO e CLIENTES VISITADOS só em FRIO) — nos demais blocos é bloqueado e não soma, para não duplicar */
 function bloqueadoNoSeg(eq,c,g){ return !!c.segUnico&&eq.segmentos&&eq.segmentos.length>1&&g!==eq.segmentos[0]; }
@@ -1023,7 +1039,7 @@ function renderEquipe(eq){
   // tabela por linha na semana
   const ls=linhasEquipe(eq,{semanas:[s]}).filter(l=>(!regionalSel||(l.regional||'')===regionalSel)&&(!linhaSel||l.id===linhaSel));
   const cols=camposAtivos(eq);
-  html+=`<div class="card"><h3>Por ${escapeHtml(eq.rotuloLinha||'linha')} · semana <span class="h3-side">${ls.length} linhas</span></h3><div class="tablewrap"><table class="dt">${theadCampos(cols,[`<th>${escapeHtml(eq.rotuloLinha||'Linha')}</th>`,...(eq.usaRegional?['<th>Reg.</th>']:[])],c=>(isNum(c)?'r ':'')+(c.auto?'auto':''))}<tbody>`;
+  html+=`<div class="card"><h3>Por ${escapeHtml(rotuloLinhaTxt(eq).toLowerCase())} · semana <span class="h3-side">${ls.length} linhas</span></h3><div class="tablewrap"><table class="dt">${theadCampos(cols,[`<th>${escapeHtml(rotuloLinhaTxt(eq))}</th>`,...(eq.usaRegional?['<th>Reg.</th>']:[])],c=>(isNum(c)?'r ':'')+(c.auto?'auto':''))}<tbody>`;
   // por regional (R1 > R2 > outras); dentro da regional, maior valor do indicador primeiro
   const ordenar=c&&isNum(c)?ls.slice().sort((a,b)=>{const ra=rankRegional(a.regional),rb=rankRegional(b.regional); if(ra!==rb||norm(a.regional)!==norm(b.regional)) return cmpRegional(a,b); return n(totalSemana(eq,s,c,{linhaId:b.id}))-n(totalSemana(eq,s,c,{linhaId:a.id}));}):ls;
   ordenar.forEach(l=>{
@@ -1078,7 +1094,7 @@ function ligarTips(root){
   });
 }
 function exportCsv(eq,per){
-  const cols=camposAtivos(eq); const linhas=[['Semana','Equipe',eq.rotuloLinha||'Linha','Regional','Segmento',...cols.map(c=>c.nome)]];
+  const cols=camposAtivos(eq); const linhas=[['Semana','Equipe',rotuloLinhaTxt(eq),'Regional','Segmento',...cols.map(c=>c.nome)]];
   per.forEach(w=>linhasEquipe(eq,{semanas:[w]}).forEach(l=>segs(eq).forEach(g=>{
     const vs=cols.map(c=>valor(w,eq,l.id,g,c)); if(!vs.some(temValor)) return;
     linhas.push([w,eq.nome,l.nome,l.regional||'',g,...vs.map(v=>temValor(v)?String(v).replace('.',','):'')]);
@@ -1109,13 +1125,16 @@ function renderLanc(){
   if(!ls.length){ html+=`<div class="empty">Nenhuma ${escapeHtml((eq.rotuloLinha||'linha').toLowerCase())} cadastrada.</div>`; }
   segs(eq).forEach((g,gi)=>{
     if(g) html+=`<div class="seg-title"><i style="background:${SEG_CORES[gi%5]}"></i>${escapeHtml(g)}</div>`;
-    html+=`<div class="card" style="padding:10px;"><div class="tablewrap"><table class="dt" data-seg="${escapeHtml(g)}">${theadCampos(cols,[`<th>${escapeHtml(eq.rotuloLinha||'Linha')}</th>`,...(eq.usaRegional?['<th>Reg.</th>']:[])],c=>(isNum(c)?'r ':'')+(c.auto?'auto':''))}<tbody>`;
+    html+=`<div class="card" style="padding:10px;"><div class="tablewrap"><table class="dt" data-seg="${escapeHtml(g)}">${theadCampos(cols,[`<th>${escapeHtml(rotuloLinhaTxt(eq))}</th>`,...(eq.usaRegional?['<th>Reg.</th>']:[])],c=>(isNum(c)?'r ':'')+(c.auto?'auto':''))}<tbody>`;
     ls.forEach(l=>{
       const soLeitura=!pode||!linhaEditavel(eq,l);
       const outro=porEmail(eq)&&!isAdmin()&&l.email&&l.ativo!==false&&!minhaLinha(eq,l);
       html+=`<tr${minhaLinha(eq,l)?' class="minha"':''}><td class="nome">${escapeHtml(l.nome)}${minhaLinha(eq,l)?' <span class="pill ok">você</span>':''}${porEmail(eq)&&!linhaEditavel(eq,l)&&!outro?` <span class="pill pend" title="${l.email?'E-mail removido de Quem preenche — linha inativa':'Linha antiga sem e-mail — ligue a um e-mail em Equipes &amp; Campos para editar'}">${l.email?'inativo':'histórico'}</span>`:''}</td>${eq.usaRegional?`<td>${l.regional?`<span class="reg ${escapeHtml(l.regional)}">${escapeHtml(l.regional)}</span>`:''}</td>`:''}`;
+      const kSub=rkey(s,eq.id,l.id,g), rSub=state.registros[kSub], nS=eq.tipo==='manual'?nSub(kSub):0;
+      const podeSub=eq.tipo==='manual'&&!soLeitura;
       cols.forEach(c=>{
-        const v=valor(s,eq,l.id,g,c);
+        let v=valor(s,eq,l.id,g,c);
+        if(eq.tipo==='manual'&&!c.auto&&nS) v=rSub&&rSub.v?rSub.v[c.id]:undefined;   // com linhas extras, mostra só o valor desta linha
         if(bloqueadoNoSeg(eq,c,g)){ html+=`<td class="bloq" title="Lançado só em ${escapeHtml(eq.segmentos[0])}">—</td>`; return; }
         if(c.auto){ const live=autoVal(eq,s,l.id,c.auto)!==undefined; html+=`<td class="auto ${live?'':'hist'}" title="${live?'do app':'histórico gravado'}">${fmt(c,v)}</td>`; return; }
         if(eq.tipo!=='manual'){ html+=`<td class="auto hist" title="sem informação no app — zerado">${fmt(c,v)}</td>`; return; }
@@ -1127,6 +1146,21 @@ function renderLanc(){
         else html+=`<td><input type="text" class="num-in" inputmode="decimal" autocomplete="off" ${da} value="${escapeHtml(numParaTexto(c,val))}"${c.tipo==='percentual'?' placeholder="%" title="Digite em %, ex.: 12,5"':c.tipo==='moeda'?' placeholder="R$"':''}></td>`;
       });
       html+=`</tr>`;
+      /* linhas extras da mesma pessoa: outros números na semana, somados no total */
+      for(let idx=2;idx<=nS+1;idx++){
+        html+=`<tr class="sub"><td class="nome sub-nome">↳ ${escapeHtml(l.nome)} · ${idx}${podeSub?` <button class="btn icon danger" type="button" data-rmsub="${idx}" data-l="${l.id}" data-g="${escapeHtml(g)}" title="Apagar esta linha">×</button>`:''}</td>${eq.usaRegional?'<td></td>':''}`;
+        cols.forEach(c=>{
+          if(bloqueadoNoSeg(eq,c,g)||c.auto){ html+=`<td class="bloq">—</td>`; return; }
+          const vv=rSub&&rSub.v?rSub.v[c.id+'#'+idx]:undefined; const val=temValor(vv)?vv:'';
+          const da=`data-l="${l.id}" data-g="${escapeHtml(g)}" data-c="${c.id}" data-i="${idx}"`;
+          if(!podeSub){ html+=`<td class="${isNum(c)?'num':''}">${fmt(c,vv)}</td>`; return; }
+          if(c.tipo==='lista') html+=`<td><select ${da}><option value=""></option>${c.opcoes.map(o=>`<option ${String(val)===o?'selected':''}>${escapeHtml(o)}</option>`).join('')}</select></td>`;
+          else if(c.tipo==='texto') html+=`<td><input type="text" ${da} value="${escapeHtml(val)}"></td>`;
+          else html+=`<td><input type="text" class="num-in" inputmode="decimal" autocomplete="off" ${da} value="${escapeHtml(numParaTexto(c,val))}"${c.tipo==='percentual'?' placeholder="%"':c.tipo==='moeda'?' placeholder="R$"':''}></td>`;
+        });
+        html+=`</tr>`;
+      }
+      if(podeSub) html+=`<tr class="sub-add"><td colspan="${cols.length+1+(eq.usaRegional?1:0)}"><button class="btn ghost small" type="button" data-addsub data-l="${l.id}" data-g="${escapeHtml(g)}">+ linha para ${escapeHtml(l.nome)}</button></td></tr>`;
     });
     html+=`<tr class="total-row" data-total="${escapeHtml(g)}"><td>TOTAL${g?' '+escapeHtml(g):''}</td>${eq.usaRegional?'<td></td>':''}${cols.map(c=>`<td class="num" data-tc="${c.id}">${isNum(c)?fmt(c,totalSemana(eq,s,c,{seg:g})):''}</td>`).join('')}</tr></tbody></table></div></div>`;
   });
@@ -1147,16 +1181,35 @@ function renderLanc(){
   body.querySelectorAll('input[data-c],select[data-c]').forEach(inp=>{
     const handler=()=>{
       const c=eq.campos.find(x=>x.id===inp.dataset.c); const k=rkey(s,eq.id,inp.dataset.l,inp.dataset.g);
+      const cid=inp.dataset.i?c.id+'#'+inp.dataset.i:c.id;
       let v=inp.value; if(isNum(c)) v=textoParaNum(c,v); if(isNum(c)&&v!==''&&!isFinite(v)) return;
       const r=state.registros[k]||{s,e:eq.id,l:inp.dataset.l,g:inp.dataset.g,v:{}};
-      if(v===''||v===null) delete r.v[c.id]; else r.v[c.id]=v;
+      if(v===''||v===null) delete r.v[cid]; else r.v[cid]=v;
       r.u=emailAtual()||'local'; r.t=new Date().toISOString();
       if(Object.keys(r.v).length) state.registros[k]=r; else delete state.registros[k];
-      marcarReg(k,c.id); save(); atualizarTotaisLanc(eq);
+      marcarReg(k,cid); save(); atualizarTotaisLanc(eq);
     };
     if(inp.classList.contains('num-in')){ const c0=eq.campos.find(x=>x.id===inp.dataset.c); inp.addEventListener('input',()=>mascararNumero(inp,c0)); inp.addEventListener('focus',()=>inp.select()); }
     inp.addEventListener('change',handler);
     if(inp.tagName==='INPUT') inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); handler(); moverFoco(inp,e.shiftKey?-1:1); } });
+  });
+  body.querySelectorAll('[data-addsub]').forEach(b=>b.onclick=()=>{
+    const k=rkey(s,eq.id,b.dataset.l,b.dataset.g); const novo=nSub(k)+2; SUBLOCAL[k]=novo; renderLanc();
+    const el=Array.from(document.querySelectorAll('#lanc-body [data-i="'+novo+'"]')).find(x=>x.dataset.l===b.dataset.l&&x.dataset.g===b.dataset.g); if(el) el.focus();
+  });
+  body.querySelectorAll('[data-rmsub]').forEach(b=>b.onclick=()=>{
+    const k=rkey(s,eq.id,b.dataset.l,b.dataset.g), i=+b.dataset.rmsub, ult=nSub(k)+1; const r=state.registros[k];
+    if(r&&r.v){
+      const temAlgo=Object.keys(r.v).some(x=>x.endsWith('#'+i)&&temValor(r.v[x]));
+      if(temAlgo&&!confirm('Apagar os valores desta linha?')) return;
+      /* apaga a linha i e sobe as seguintes (i+1 → i …) */
+      for(let j=i;j<=ult;j++){ eq.campos.forEach(c=>{ const de=c.id+'#'+(j+1), para=c.id+'#'+j;
+        const val=j<ult?r.v[de]:undefined; const tinha=r.v[para]!==undefined||val!==undefined;
+        if(val===undefined) delete r.v[para]; else r.v[para]=val; if(tinha) marcarReg(k,para); }); }
+      r.u=emailAtual()||'local'; r.t=new Date().toISOString();
+      if(!Object.keys(r.v).length) delete state.registros[k];
+    }
+    SUBLOCAL[k]=Math.max(1,ult-1); save(); renderLanc();
   });
   const add=document.getElementById('btn-add-linha');
   if(add) add.onclick=()=>{
