@@ -6,10 +6,12 @@ body{font-family:Barlow,system-ui,sans-serif;color:var(--texto);background:var(-
 h1,h2,h3{font-family:'Barlow Semi Condensed',Barlow,sans-serif;margin:0}
 a{color:var(--verde)}a:hover{color:var(--verde-esc)}
 .topo{height:var(--topo);background:var(--verde-esc);color:#fff;display:flex;align-items:center;gap:12px;padding:0 16px;position:sticky;top:0;z-index:20}
-.marca{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none;flex:1;min-width:0}
+.marca{display:flex;align-items:center;gap:14px;color:#fff;text-decoration:none;flex:1;min-width:0}
 .marca:hover{color:#fff}
 .marca-m{width:32px;height:32px;border-radius:8px;background:#fff;color:var(--verde-esc);display:flex;align-items:center;justify-content:center;font-weight:700;font-family:'Barlow Semi Condensed'}
-.marca-nome{font-family:'Barlow Semi Condensed';font-weight:700;font-size:21px}
+.marca-logo{height:26px;width:auto;display:block;flex:0 0 auto}
+.marca-sep{width:1px;height:28px;background:rgba(255,255,255,.45);flex:0 0 auto}
+.marca-nome{white-space:nowrap;font-family:'Barlow Semi Condensed';font-weight:700;font-size:21px}
 .marca-sub{font-size:13px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .topo-dir{display:flex;align-items:center;gap:12px}
 .quem{display:flex;align-items:center;gap:10px}
@@ -88,7 +90,11 @@ table.t td.adm{color:var(--verde-esc);font-weight:700}
   .menu{position:fixed;left:0;top:var(--topo);z-index:30;transform:translateX(-100%);transition:transform .2s;box-shadow:2px 0 12px rgba(0,0,0,.15)}
   .menu.aberto{transform:none}
   .marca-sub,.quem-txt span{display:none}
+  .marca{gap:10px}.marca-logo{height:20px}.marca-sep{height:22px}.marca-nome{font-size:18px}
   .tela{padding:16px}
+}
+@media (max-width:620px){
+  .quem-txt{display:none}
 }
 
 /* ícone + texto no menu, e menu recolhido */
