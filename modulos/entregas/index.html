@@ -328,6 +328,7 @@ tr.grp .pbar{max-width:320px;margin-top:5px;}
 .bdg.retorno{background:#f3e6de;color:var(--ferrugem);}.bdg.parcial{background:#fbf2d3;color:#8a6a07;}.bdg.aguardaret{background:#e8eef5;color:#2d4f73;}
 .lt.st-aguardaret{border-left-color:#2d4f73;background:#f1f5fa;}
 .tipo-conc{display:flex;gap:8px;flex-wrap:wrap;}
+.pend-lista{display:flex;gap:6px;flex-wrap:wrap;}
 </style>
 </head>
 <body>
@@ -451,6 +452,7 @@ tr.grp .pbar{max-width:320px;margin-top:5px;}
         <p class="muted" style="margin:0 0 8px;">Vêm da <b>Central de acessos</b>: e-mails liberados na Entrega Técnica como Admin ou Consultor. O nome é o que vem antes do @ (ex.: lucas.xavier@… → Lucas Xavier).</p><div id="pr-consultores-lista"></div>
         <div class="field" style="margin-top:10px;"><label for="pr-tipos">Tipos de equipamento (um por linha)</label><textarea id="pr-tipos" rows="7"></textarea></div>
         <div class="field" style="margin-top:10px;"><label for="pr-motivos">Motivos de impossibilidade de entrega (um por linha)</label><textarea id="pr-motivos" rows="6"></textarea></div>
+        <div class="field" style="margin-top:10px;"><label for="pr-ativs">O que pode ficar pendente numa entrega parcial (um por linha)</label><textarea id="pr-ativs" rows="7"></textarea></div>
       </div>
       <div class="card"><h3>Prazos de cada etapa (dias)</h3>
         <div class="grid" id="pr-prazos"></div>
@@ -545,6 +547,7 @@ const CONFIG_DEFAULT={
   consultores:[{nome:'Karlos Manoel',cargo:'Consultor Técnico de Manejo',email:''},{nome:'Lucas Xavier',cargo:'Consultor Técnico de Manejo',email:''},{nome:'Rejane Falcão',cargo:'Coordenadora de Manejo',email:''}],
   tipos:['Pivô completo','Pivô parte aérea','Pivô parcial','Bombeamento','Carretel','Telemetria (Nexus)','Repetidora','Central','Outro'],
   prazos:{pendente:15,andamento:10,envio:7,fabrica:15,pagamento:30,retorno:3},
+  atividadesPendentes:['Teste de funcionamento','Rodar a seco','Rodar com água','Ligação de energia','Parametrização do painel','Treinamento do operador','Outro'],
   motivosImpossibilidade:['Sem energia','Área ou base não liberada','Falta de material','Cliente ausente','Clima / chuva','Outro'],
   atencaoPct:75,
   emailPara:'',emailCc:'',
@@ -612,11 +615,15 @@ function divAtiva(e){return !!(e.divergencia&&e.divergencia.ativa);}
    Retorno: retornoDe = lote de origem, previsaoRetorno. Nada entregue: aguardandoRetorno + previsaoRetorno.
    semPagamento: fábrica não pagou a parcial → cobrada junto com o pagamento do retorno. */
 function ehRetorno(e){return !!(e.retornoDe||e.aguardandoRetorno);}
+function textoPend(e){return [...(e.pendencias||[]),e.pendenciaObs].filter(Boolean).join(', ');}
+/* pivôs que contam no total da obra: o retorno conclui os mesmos pivôs da parcial (não soma de novo);
+   retornos antigos (divididos por quantidade, com itensOriginais na origem) continuam somando */
+function pivosConta(e){if(e.retornoDe){const o=getRec('entregas',e.retornoDe);if(!(o&&o.itensOriginais))return 0;}return pivos(e);}
 function retornoAberto(e){return ehRetorno(e)&&(etapa(e)==='pendente'||etapa(e)==='andamento');}
 function faltaImp(e){return (e.tipoConclusao==='parcial'||e.aguardandoRetorno)&&!(e.anexos||[]).some(a=>a.tipo==='impossibilidade');}
 function numeroDe(id){const x=id&&getRec('entregas',id);return x?(x.numero||'lote'):'';}
 function bdgsExtra(e){const b=[];if(e.retornoDe)b.push(`<span class="bdg retorno">↩ Retorno de ${esc(numeroDe(e.retornoDe))}</span>`);else if(e.aguardandoRetorno)b.push('<span class="bdg retorno">↩ Aguardando retorno</span>');if(e.tipoConclusao==='parcial')b.push('<span class="bdg parcial">Parcial</span>');if(e.semPagamento&&!e.pagamento)b.push('<span class="bdg aguardaret">Cobra no retorno</span>');if(faltaImp(e))b.push('<span class="bdg div">Falta termo de impossibilidade</span>');return b.join('');}
-function tagsCurtas(e){const t=[];if(ehRetorno(e))t.push('retorno'+(e.previsaoRetorno&&etapa(e)==='pendente'?' prev. '+fmtDc(e.previsaoRetorno):''));if(e.tipoConclusao==='parcial')t.push('parcial');if(e.semPagamento&&!e.pagamento)t.push('cobra no retorno');if(faltaImp(e))t.push('falta termo impossib.');return t.length?t.join(' · ')+' · ':'';}
+function tagsCurtas(e){const t=[];if(ehRetorno(e))t.push('retorno'+(textoPend(e)?': '+textoPend(e):'')+(e.previsaoRetorno&&etapa(e)==='pendente'?' · prev. '+fmtDc(e.previsaoRetorno):''));if(e.tipoConclusao==='parcial')t.push('parcial');if(e.semPagamento&&!e.pagamento)t.push('cobra no retorno');if(faltaImp(e))t.push('falta termo impossib.');return t.length?t.join(' · ')+' · ':'';}
 function itensDe(e){return Array.isArray(e.itens)?e.itens.filter(i=>i&&(i.tipo||i.obs)):[];}
 const CURTO={'Pivô completo':'PC completo','Pivô parte aérea':'PC parte aérea','Pivô parcial':'PC parcial','Telemetria (Nexus)':'Nexus','Repetidora':'Repetidoras','Bombeamento':'Bombeamento','Carretel':'Carretel','Central':'Central'};
 function itemTxt(i){const q=nNum(i.qtd)||1;let t=CURTO[i.tipo]||i.tipo||'';if(i.tipo==='Bombeamento'&&q>1)t='Bombeamentos';if(i.tipo==='Carretel'&&q>1)t='Carretéis';if(i.tipo==='Outro'||!i.tipo)t=i.obs||'Outro';else if(i.obs)t+=' '+i.obs;return (q+' '+t).trim();}
@@ -693,12 +700,12 @@ function montarGrupos(){
     g.lotes.forEach((e,i)=>{LOTE[e.id]={n:i+1,de:g.lotes.length,key:g.key};});
     const ov=getRec('grupos',g.key);const temOv=ov&&ov.totalPivos!=null&&ov.totalPivos!=='';
     const totObra=g.obraRef?nNum(g.obraRef.qtdPivos):0;
-    g.feitos=g.lotes.reduce((a,e)=>a+pivos(e),0);
-    g.pagos=g.lotes.filter(e=>etapa(e)==='paga').reduce((a,e)=>a+pivos(e),0);
+    g.feitos=g.lotes.reduce((a,e)=>a+pivosConta(e),0);
+    g.pagos=g.lotes.filter(e=>etapa(e)==='paga'&&!(e.tipoConclusao==='parcial'&&e.retornoId&&getRec('entregas',e.retornoId)&&etapa(getRec('entregas',e.retornoId))!=='paga')).reduce((a,e)=>a+pivosConta(e),0);
     g.total=temOv?nNum(ov.totalPivos):(totObra||g.feitos);
     g.totalOrigem=temOv?'manual':(totObra?'obra':'lotes');g.totalObra=totObra;
     g.saldo=Math.max(0,g.total-g.feitos);
-    g.retPend=g.lotes.filter(retornoAberto).reduce((a,e)=>a+pivos(e),0);
+    g.retPend=g.lotes.filter(e=>e.aguardandoRetorno&&retornoAberto(e)||e.tipoConclusao==='parcial'&&e.retornoId&&getRec('entregas',e.retornoId)&&retornoAberto(getRec('entregas',e.retornoId))).reduce((a,e)=>a+pivos(e),0);
     g.abertos=g.lotes.filter(e=>ABERTAS.includes(etapa(e)));
     g.div=g.abertos.some(divAtiva);
     g.pior=g.abertos.map(e=>prazo(e).st).sort((a,b)=>(ORD_ST[a]??5)-(ORD_ST[b]??5))[0]||(g.virtual?prazo(g.virtual).st:(g.lotes.length?'concluida':'semprev'));
@@ -780,7 +787,7 @@ function textoDias(pr){
 function cardHtml(e){
   const pr=prazo(e),div=divAtiva(e);const et=pr.et;
   const acao=ETAPA[et].acao;const nAnx=(e.anexos||[]).length;
-  const sub=[e.obra||e.fazenda,rotuloLote(e),itensResumo(e)].filter(Boolean).join(' · ');
+  const sub=[e.obra||e.fazenda,rotuloLote(e),itensResumo(e),textoPend(e)?'falta: '+textoPend(e):''].filter(Boolean).join(' · ');
   return `<div class="etc p-${pr.st}${div?' div':''}${e.virtual?' virtual':''}" data-card="${esc(e.id)}">
     <div class="bdgs">${bdgPrazo(pr)}${div?'<span class="bdg div">Divergência</span>':''}${bdgsExtra(e)}${e.virtual||e.obraId?'<span class="bdg montagem">Montagem</span>':''}</div>
     <div class="tt">${esc(e.cliente)}</div>
@@ -846,7 +853,7 @@ function renderQuadro(){
 const CLI_FECHADO=new Set(),CLI_ABERTO_R=new Set();
 function bdgSt(st){return `<span class="bdg ${st}">${PRAZO_INFO[st]||st}</span>`;}
 function barraPivos(g){if(!g.total)return '';const p=v=>Math.min(100,v/g.total*100);return `<div class="pbar" title="${g.pagos} pago(s) · ${g.feitos-g.pagos} em andamento · ${g.saldo} sem ET"><i class="pg" style="width:${p(g.pagos)}%"></i><i class="an" style="width:${p(g.feitos-g.pagos)}%"></i></div>`;}
-function textoPivos(g){if(!g.total&&!g.feitos)return 'sem pivôs informados';return `${g.feitos-g.retPend} de ${g.total} pivô(s) entregues${g.retPend?` · <b style="color:var(--ferrugem)">${g.retPend} aguardando retorno</b>`:''}${g.totalOrigem==='manual'?' <span class="muted">(ajustado)</span>':g.totalOrigem==='lotes'?' <span class="muted">(soma dos lotes)</span>':''}`;}
+function textoPivos(g){if(!g.total&&!g.feitos)return 'sem pivôs informados';return `${g.feitos} de ${g.total} pivô(s) com ET${g.retPend?` · <b style="color:var(--ferrugem)">${g.retPend} incompleto(s), aguardando retorno</b>`:''}${g.totalOrigem==='manual'?' <span class="muted">(ajustado)</span>':g.totalOrigem==='lotes'?' <span class="muted">(soma dos lotes)</span>':''}`;}
 function renderRaias(lista){
   const G=montarGrupos();const ids=new Set(lista.map(e=>e.id));
   const filtro=!!($('q-busca').value||$('q-consultor').value||$('q-prazo').value||FILTRO_KPI);
@@ -921,7 +928,7 @@ function renderClientes(){
   const q=$('c-busca').value,f=$('c-filtro').value;
   const grupos={};
   todasComVirtuais().forEach(e=>{const k=chave(e.cliente);(grupos[k]=grupos[k]||{nome:e.cliente,itens:[]}).itens.push(e);});
-  let G=Object.entries(grupos).map(([k,g])=>{const ab=g.itens.filter(e=>ABERTAS.includes(etapa(e)));return Object.assign(g,{k,ab:ab.length,atr:ab.filter(e=>prazo(e).st==='atrasada').length,div:ab.filter(divAtiva).length,pv:g.itens.reduce((a,e)=>a+pivos(e),0)});});
+  let G=Object.entries(grupos).map(([k,g])=>{const ab=g.itens.filter(e=>ABERTAS.includes(etapa(e)));return Object.assign(g,{k,ab:ab.length,atr:ab.filter(e=>prazo(e).st==='atrasada').length,div:ab.filter(divAtiva).length,pv:g.itens.reduce((a,e)=>a+pivosConta(e),0)});});
   if(q)G=G.filter(g=>chave(g.nome).includes(chave(q))||g.itens.some(e=>bateBusca(e,q)));
   if(f==='abertas')G=G.filter(g=>g.ab);if(f==='atrasadas')G=G.filter(g=>g.atr);
   G.sort((a,b)=>b.atr-a.atr||b.ab-a.ab||a.nome.localeCompare(b.nome,'pt-BR'));
@@ -960,7 +967,7 @@ function renderTabela(){
 $('t-excel').onclick=async()=>{
   try{await loadXlsx();}catch(e){toast('Não foi possível carregar o Excel.');return;}
   montarGrupos();const L=linhasTabela();
-  const rows=L.map(e=>{const pr=prazo(e);return {'Nº':e.numero||'','Cliente':e.cliente,'Fazenda':e.fazenda||'','Obra (montagem)':e.obra||'','Lote':rotuloLote(e),'Etapa':ETAPA[pr.et].nome,'Divergência':divAtiva(e)?(e.divergencia.motivo||'sim'):'','Equipamentos':itensResumo(e),'Pivôs':pivos(e)||'','Consultor':e.consultor||'','Início':fmtD(e.inicio),'Término':fmtD(e.termino),'Duração (dias)':e.inicio&&e.termino?difDias(e.inicio,e.termino)+1:'','E-mail fábrica':fmtD(e.emailFabrica),'Aprovação':fmtD(e.aprovacao),'Duração aprovação':e.emailFabrica&&e.aprovacao?difDias(e.emailFabrica,e.aprovacao):'','Pagamento':fmtD(e.pagamento),'Valor (R$)':nNum(e.valor)||'','NF / cobrança':e.nf||'','Prazo':PRAZO_INFO[pr.st]||'','Tipo de conclusão':e.tipoConclusao==='parcial'?'Parcial':e.aguardandoRetorno?'Nada entregue':e.tipoConclusao==='total'?'Total':'','Retorno de':e.retornoDe?numeroDe(e.retornoDe):'','Retorno criado':e.retornoId?numeroDe(e.retornoId):'','Motivo impossibilidade':e.impossibilidade?e.impossibilidade.motivo:'','Previsão de retorno':fmtD(e.previsaoRetorno||(e.impossibilidade&&e.impossibilidade.previsao)),'Fábrica não pagou':e.semPagamento?fmtD(e.semPagamento.em):'','Dias na etapa':pr.dias==null?'':pr.dias,'Anexos':(e.anexos||[]).length,'Pasta':e.pasta&&e.pasta.webUrl||''};});
+  const rows=L.map(e=>{const pr=prazo(e);return {'Nº':e.numero||'','Cliente':e.cliente,'Fazenda':e.fazenda||'','Obra (montagem)':e.obra||'','Lote':rotuloLote(e),'Etapa':ETAPA[pr.et].nome,'Divergência':divAtiva(e)?(e.divergencia.motivo||'sim'):'','Equipamentos':itensResumo(e),'Pivôs':pivos(e)||'','Consultor':e.consultor||'','Início':fmtD(e.inicio),'Término':fmtD(e.termino),'Duração (dias)':e.inicio&&e.termino?difDias(e.inicio,e.termino)+1:'','E-mail fábrica':fmtD(e.emailFabrica),'Aprovação':fmtD(e.aprovacao),'Duração aprovação':e.emailFabrica&&e.aprovacao?difDias(e.emailFabrica,e.aprovacao):'','Pagamento':fmtD(e.pagamento),'Valor (R$)':nNum(e.valor)||'','NF / cobrança':e.nf||'','Prazo':PRAZO_INFO[pr.st]||'','Tipo de conclusão':e.tipoConclusao==='parcial'?'Parcial':e.aguardandoRetorno?'Nada entregue':e.tipoConclusao==='total'?'Total':'','Retorno de':e.retornoDe?numeroDe(e.retornoDe):'','Retorno criado':e.retornoId?numeroDe(e.retornoId):'','Pendências':textoPend(e),'Motivo impossibilidade':e.impossibilidade?e.impossibilidade.motivo:'','Previsão de retorno':fmtD(e.previsaoRetorno||(e.impossibilidade&&e.impossibilidade.previsao)),'Fábrica não pagou':e.semPagamento?fmtD(e.semPagamento.em):'','Dias na etapa':pr.dias==null?'':pr.dias,'Anexos':(e.anexos||[]).length,'Pasta':e.pasta&&e.pasta.webUrl||''};});
   const ws=XLSX.utils.json_to_sheet(rows);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Entregas');XLSX.writeFile(wb,'entrega_tecnica_'+hojeISO()+'.xlsx');
 };
 
@@ -1003,7 +1010,7 @@ function renderPainel(){
   const doAno=todas.filter(e=>!e.virtual&&e.termino&&(!a||e.termino.slice(0,4)===a));
   const ab=todas.filter(e=>ABERTAS.includes(etapa(e)));
   const ciclo=mediana(doAno.filter(e=>e.pagamento).map(e=>difDias(e.termino,e.pagamento)));
-  $('p-tot').innerHTML=tbox('Concluídas em campo',int(doAno.length),a?'em '+a:'no total')+tbox('Pivôs entregues',int(doAno.reduce((s,e)=>s+pivos(e),0)),'completos, parte aérea e parciais')+tbox('Em aberto agora',int(ab.length),ab.filter(e=>prazo(e).st==='atrasada').length+' atrasada(s)',true)+tbox('Término → pagamento',ciclo==null?'—':Math.round(ciclo)+' dias','mediana do ciclo');
+  $('p-tot').innerHTML=tbox('Concluídas em campo',int(doAno.length),a?'em '+a:'no total')+tbox('Pivôs entregues',int(doAno.reduce((s,e)=>s+pivosConta(e),0)),'completos, parte aérea e parciais')+tbox('Em aberto agora',int(ab.length),ab.filter(e=>prazo(e).st==='atrasada').length+' atrasada(s)',true)+tbox('Término → pagamento',ciclo==null?'—':Math.round(ciclo)+' dias','mediana do ciclo');
   /* resumo por status */
   const linhas=[...ETAPAS.map(et=>({id:et.id,nome:et.nome,L:todas.filter(e=>etapa(e)===et.id)})),{id:'div',nome:'Divergência na ET',L:ab.filter(divAtiva)}];
   const cnt=(L,st)=>L.filter(e=>{const s=prazo(e).st;return st==='noprazo'?(s==='noprazo'||s==='agendada'):s===st;}).length;
@@ -1045,6 +1052,7 @@ function renderParametros(){
   $('pr-tipos').value=(c.tipos||[]).join('\n');
   $('pr-prazos').innerHTML=ETAPAS.filter(e=>e.id!=='paga').map(e=>`<div class="field"><label for="pr-pz-${e.id}">${esc(e.nome)}</label><input id="pr-pz-${e.id}" type="number" min="0" value="${esc(c.prazos[e.id])}"></div>`).join('')+`<div class="field"><label for="pr-pz-retorno">Retorno (dias após a previsão)</label><input id="pr-pz-retorno" type="number" min="0" value="${esc(c.prazos.retorno)}"></div>`;
   $('pr-motivos').value=(c.motivosImpossibilidade||[]).join('\n');
+  $('pr-ativs').value=(c.atividadesPendentes||CONFIG_DEFAULT.atividadesPendentes).join('\n');
   $('pr-atencao').value=c.atencaoPct;
   $('pr-email-para').value=c.emailPara||'';$('pr-email-cc').value=c.emailCc||'';$('pr-email-modelo').value=c.emailModelo||'';
   $('pr-corte').value=c.corteObras||'';
@@ -1058,6 +1066,7 @@ $('pr-salvar').onclick=()=>{
   const tipos=uniq($('pr-tipos').value.split('\n').map(normTxt));
   const pz={};ETAPAS.filter(e=>e.id!=='paga').forEach(e=>pz[e.id]=Math.max(0,Math.round(n($('pr-pz-'+e.id).value))));pz.retorno=Math.max(0,Math.round(n($('pr-pz-retorno').value)));
   const mot=uniq($('pr-motivos').value.split('\n').map(normTxt));setConfig('motivosImpossibilidade',mot.length?mot:CONFIG_DEFAULT.motivosImpossibilidade);
+  const atv=$('pr-ativs').value.split('\n').map(normTxt).filter(Boolean);setConfig('atividadesPendentes',atv.length?Array.from(new Set(atv)):CONFIG_DEFAULT.atividadesPendentes);
   setConfig('tipos',tipos.length?tipos:CONFIG_DEFAULT.tipos);setConfig('prazos',pz);
   setConfig('atencaoPct',Math.min(100,Math.max(10,Math.round(n($('pr-atencao').value)||75))));
   setConfig('emailPara',normTxt($('pr-email-para').value));setConfig('emailCc',normTxt($('pr-email-cc').value));setConfig('emailModelo',$('pr-email-modelo').value);
@@ -1201,8 +1210,8 @@ function renderObraSel(){
 }
 function infoParcial(e){
   const im=e.impossibilidade;const L=[];
-  if(e.tipoConclusao==='parcial'){const r=e.retornoId&&getRec('entregas',e.retornoId);L.push(`<b>Entrega parcial</b> em ${fmtD(im&&im.data||e.termino)}. Pendente: <b>${r?esc(itensResumo(r)):'—'}</b>${r?` → retorno <a href="#" data-ir="${esc(e.retornoId)}">${esc(r.numero)}</a> (${esc(ETAPA[etapa(r)].nome)})`:''}.`);}
-  if(e.retornoDe){const o=getRec('entregas',e.retornoDe);L.push(`<b>Retorno</b> da entrega parcial ${o?`<a href="#" data-ir="${esc(e.retornoDe)}">${esc(o.numero)}</a>`:''}. Previsão: <b>${fmtD(e.previsaoRetorno)}</b>.${o&&o.semPagamento&&!o.pagamento?' A parcial não foi paga: será quitada com este retorno.':''}`);}
+  if(e.tipoConclusao==='parcial'){const r=e.retornoId&&getRec('entregas',e.retornoId);L.push(`<b>Entrega parcial</b> em ${fmtD(im&&im.data||e.termino)}. Ficou pendente: <b>${esc(textoPend(e)||(r&&e.itensOriginais?itensResumo(r):'—'))}</b>${r?` → retorno <a href="#" data-ir="${esc(e.retornoId)}">${esc(r.numero)}</a> (${esc(ETAPA[etapa(r)].nome)})`:''}.`);}
+  if(e.retornoDe){const o=getRec('entregas',e.retornoDe);L.push(`<b>Retorno</b> para concluir: <b>${esc(textoPend(e)||'—')}</b>, da entrega parcial ${o?`<a href="#" data-ir="${esc(e.retornoDe)}">${esc(o.numero)}</a>`:''}. Previsão: <b>${fmtD(e.previsaoRetorno)}</b>.${o&&o.semPagamento&&!o.pagamento?' A parcial não foi paga: será quitada com este retorno.':''}`);}
   if(e.aguardandoRetorno&&!e.retornoDe)L.push(`<b>Nada foi entregue</b> na última ida (${(e.tentativas||[]).length} tentativa(s)). Previsão de retorno: <b>${fmtD(e.previsaoRetorno)}</b>.`);
   if(im)L.push(`Motivo: <b>${esc(im.motivo)}</b>${im.obs?' — '+esc(im.obs):''}${im.assinante?' · assinado por '+esc(im.assinante):''}.`);
   if(e.semPagamento&&!e.pagamento)L.push(`<b>Fábrica não pagou</b> esta parcial (${fmtD(e.semPagamento.em)}) — cobrada junto com o retorno.`);
@@ -1272,7 +1281,7 @@ function voltarEtapa(id){
   if(!podeEditar())return;const e=getRec('entregas',id);if(!e)return;const et=etapa(e);const c=CAMPO_ETAPA[et];if(!c)return;
   const ant=ETAPAS[ETAPA[et].i-1];
   modal('Voltar etapa',`<p style="margin:0 0 10px;"><b>${esc(e.numero||'')} · ${esc(rotuloCliente(e))}</b></p>
-    <p>A entrega volta de <b>${esc(ETAPA[et].nome)}</b> para <b>${esc(ant.nome)}</b>. A data “${esc(c[1])}” (${fmtD(e[c[0]])}) será apagada; os anexos continuam.</p>${et==='envio'&&e.tipoConclusao==='parcial'?`<div class="note warn">Esta entrega foi parcial: os equipamentos voltam ao total previsto e o retorno ${esc(numeroDe(e.retornoId))} é excluído (se ainda não começou).</div>`:''}
+    <p>A entrega volta de <b>${esc(ETAPA[et].nome)}</b> para <b>${esc(ant.nome)}</b>. A data “${esc(c[1])}” (${fmtD(e[c[0]])}) será apagada; os anexos continuam.</p>${et==='envio'&&e.tipoConclusao==='parcial'?`<div class="note warn">Esta entrega foi parcial: a parcial é desfeita e o retorno ${esc(numeroDe(e.retornoId))} é excluído (se ainda não começou).</div>`:''}
     <div class="grid">${fld('v-motivo','Motivo (opcional)','',{full:true,ph:'ex.: lançado por engano, fábrica pediu correção'})}</div>`,[
     {t:'Cancelar',fn:()=>{fecharModal();abrirEntrega(id);}},
     {t:'← Voltar para '+ant.nome,cls:'primary',fn:()=>{
@@ -1280,7 +1289,7 @@ function voltarEtapa(id){
       if(et==='envio'&&x.tipoConclusao==='parcial'){const r=x.retornoId&&getRec('entregas',x.retornoId);
         if(r&&etapa(r)!=='pendente'){toast(`O retorno ${r.numero} já começou — volte ele primeiro.`,5000);return;}
         if(r)delRec('entregas',x.retornoId);if(x.itensOriginais)x.itens=x.itensOriginais;
-        ['itensOriginais','retornoId','impossibilidade'].forEach(k=>delete x[k]);addHist(x,'Parcial desfeita'+(r?' (retorno '+r.numero+' excluído)':''));}
+        ['itensOriginais','retornoId','impossibilidade','pendencias','pendenciaObs'].forEach(k=>delete x[k]);addHist(x,'Parcial desfeita'+(r?' (retorno '+r.numero+' excluído)':''));}
       if(et==='envio')delete x.tipoConclusao;
       const mot=val('v-motivo');addHist(x,`Voltou etapa: ${ETAPA[et].nome} → ${ETAPA[etapa(x)].nome} (apagada ${c[1]} ${fmtD(antes)})${mot?' — '+mot:''}`);
       putRec('entregas',id,x);save();fecharModal();renderAll();toast(`${x.numero||'Entrega'}: voltou para ${ETAPA[etapa(x)].nome}`);abrirEntrega(id);}}]);
@@ -1341,11 +1350,12 @@ function concluirCampo(id){
   const e=getRec('entregas',id);if(!e)return;const hoje=hojeISO();const itens=itensDe(e);
   const motivos=(state.config.motivosImpossibilidade&&state.config.motivosImpossibilidade.length?state.config.motivosImpossibilidade:CONFIG_DEFAULT.motivosImpossibilidade);
   const temTermo=(e.anexos||[]).some(a=>a.tipo==='termo'),temImp=(e.anexos||[]).some(a=>a.tipo==='impossibilidade');
+  const ativs=(state.config.atividadesPendentes&&state.config.atividadesPendentes.length?state.config.atividadesPendentes:CONFIG_DEFAULT.atividadesPendentes);
   const corpo=`<p style="margin:0 0 12px;"><b>${esc(e.numero||'')} · ${esc(rotuloCliente(e))}</b><br><span class="muted">${esc(itensResumo(e))}</span></p>
   <div class="tipo-conc"><label class="chk on"><input type="radio" name="a-tipo" value="total" checked> Entrega total</label><label class="chk"><input type="radio" name="a-tipo" value="parcial"> Entrega parcial</label><label class="chk"><input type="radio" name="a-tipo" value="nada"> Nada entregue</label></div>
   <div class="grid" style="margin-top:10px;">${fld('a-data','Data em campo',hoje,{type:'date'})}</div>
-  <div id="a-sec-parcial" style="display:none;"><div class="lbl-sec">O que foi entregue</div>
-    <table class="dt"><thead><tr><th>Equipamento</th><th class="r">Previsto</th><th class="r">Entregue</th><th class="r">Pendente</th></tr></thead><tbody>${itens.map((i,k)=>`<tr><td>${esc(itemTxt(Object.assign({},i,{qtd:''})).trim()||i.tipo)}</td><td class="num">${nNum(i.qtd)||1}</td><td class="num"><input type="number" min="0" max="${nNum(i.qtd)||1}" value="${nNum(i.qtd)||1}" data-ent="${k}" style="width:70px;border:1px solid var(--borda);border-radius:4px;padding:4px 6px;text-align:right;"></td><td class="num" data-pend="${k}">0</td></tr>`).join('')||'<tr><td colspan="4" class="empty">Cadastre os equipamentos da entrega antes.</td></tr>'}</tbody></table></div>
+  <div id="a-sec-parcial" style="display:none;"><div class="lbl-sec">O que ficou pendente <span class="req">*</span></div>
+    <div class="pend-lista">${ativs.map((t,k)=>`<label class="chk"><input type="checkbox" data-pend-at="${esc(t)}"> ${esc(t)}</label>`).join('')}</div><div class="grid" style="margin-top:8px;">${fld('a-pend-obs','Detalhe do que falta (opcional)','',{full:true,ph:'ex.: rodar com água no pivô 2 após ligação da concessionária'})}</div><p class="muted" style="margin:6px 0 0;">Os equipamentos da entrega não mudam: a parcial segue para a fábrica e um lote de retorno é criado para concluir o que falta.</p></div>
   <div id="a-sec-imp" style="display:none;"><div class="lbl-sec">Termo de impossibilidade de entrega <span class="req">*</span></div>
     <div class="grid">${fld('a-motivo','Motivo <span class="req">*</span>',null,{type:'select',options:opts(motivos,'','— escolha —')})}${fld('a-prev','Previsão de retorno <span class="req">*</span>','',{type:'date'})}${fld('a-assin','Assinado pelo cliente (nome)','')}${fld('a-impobs','Observação','')}</div>
     <div style="margin-top:8px;"><label class="muted">Termo de impossibilidade preenchido em campo <span class="req">*</span>: <input type="file" id="a-arq-imp" multiple></label>${temImp?' <span class="muted">(já há um anexado)</span>':''}</div></div>
@@ -1368,14 +1378,13 @@ function concluirCampo(id){
       if(!imp.length&&!temImp){toast('Anexe o termo de impossibilidade preenchido em campo.');return;}
       const im={motivo,previsao:prev,assinante:val('a-assin'),obs:val('a-impobs'),data};
       if(tipo==='parcial'){
-        const ent=[],pend=[];itens.forEach((i,k)=>{const q=nNum(i.qtd)||1;const inp=document.querySelector(`[data-ent="${k}"]`);const v=Math.min(q,Math.max(0,Math.round(n(inp?inp.value:q))));if(v>0)ent.push(Object.assign({},i,{qtd:v}));if(q-v>0)pend.push(Object.assign({},i,{qtd:q-v}));});
-        if(!ent.length){toast('Nada foi entregue: escolha “Nada entregue”.');return;}
-        if(!pend.length){toast('Tudo foi entregue: escolha “Entrega total”.');return;}
-        x.itensOriginais=clone(itens);x.itens=ent;x.termino=data;x.tipoConclusao='parcial';x.impossibilidade=im;
-        rid=uid('et');r={cliente:x.cliente,fazenda:x.fazenda||'',obra:x.obra||'',obraId:x.obraId||'',grupoId:x.grupoId||'',dataConclusaoObra:x.dataConclusaoObra||'',codProjetos:x.codProjetos||[],consultor:x.consultor||'',consultorEmail:x.consultorEmail||'',itens:pend,retornoDe:id,previsaoRetorno:prev,impossibilidade:im,inicio:'',termino:'',emailFabrica:'',aprovacao:'',pagamento:'',divergencia:{ativa:false,motivo:''},valor:'',nf:'',obs:'',anexos:[],criadoEm:new Date().toISOString(),criadoPor:emailAtual()||'local',historico:[]};
+        const pends=Array.from(document.querySelectorAll('[data-pend-at]:checked')).map(c=>c.dataset.pendAt);const pobs=val('a-pend-obs');
+        if(!pends.length&&!pobs){toast('Marque o que ficou pendente na entrega.');return;}
+        x.termino=data;x.tipoConclusao='parcial';x.impossibilidade=im;x.pendencias=pends;x.pendenciaObs=pobs;
+        rid=uid('et');r={cliente:x.cliente,fazenda:x.fazenda||'',obra:x.obra||'',obraId:x.obraId||'',grupoId:x.grupoId||'',dataConclusaoObra:x.dataConclusaoObra||'',codProjetos:x.codProjetos||[],consultor:x.consultor||'',consultorEmail:x.consultorEmail||'',itens:clone(itens),pendencias:pends,pendenciaObs:pobs,retornoDe:id,previsaoRetorno:prev,impossibilidade:im,inicio:'',termino:'',emailFabrica:'',aprovacao:'',pagamento:'',divergencia:{ativa:false,motivo:''},valor:'',nf:'',obs:'',anexos:[],criadoEm:new Date().toISOString(),criadoPor:emailAtual()||'local',historico:[]};
         r.numero=proximoNumero(prev.slice(0,4));x.retornoId=rid;
-        addHist(r,`Retorno criado a partir da entrega parcial ${x.numero||''}: ${itensResumo(r)} — ${motivo}; previsão ${fmtD(prev)}`);
-        addHist(x,`Entrega parcial em campo (${fmtD(data)}): entregue ${itensResumo(x)}; pendente ${itensResumo(r)} → retorno ${r.numero} — ${motivo}`);
+        addHist(r,`Retorno criado a partir da entrega parcial ${x.numero||''}: falta ${textoPend(r)} — ${motivo}; previsão ${fmtD(prev)}`);
+        addHist(x,`Entrega parcial em campo (${fmtD(data)}): falta ${textoPend(x)} → retorno ${r.numero} — ${motivo}`);
       }else{
         x.tentativas=[...(x.tentativas||[]),{inicio:x.inicio,data,motivo,previsao:prev}];
         x.aguardandoRetorno=true;x.previsaoRetorno=prev;x.impossibilidade=im;x.inicio='';x.termino='';
@@ -1389,14 +1398,14 @@ function concluirCampo(id){
   }}]);
   const sync=()=>{const t=(document.querySelector('input[name=a-tipo]:checked')||{}).value;document.querySelectorAll('.tipo-conc .chk').forEach(l=>l.classList.toggle('on',l.querySelector('input').checked));$('a-sec-parcial').style.display=t==='parcial'?'':'none';$('a-sec-imp').style.display=t==='total'?'none':'';$('a-sec-termo').style.display=t==='nada'?'none':'';};
   document.querySelectorAll('input[name=a-tipo]').forEach(i=>i.onchange=sync);
-  document.querySelectorAll('[data-ent]').forEach(inp=>inp.oninput=()=>{const k=inp.dataset.ent;const q=nNum(itens[k].qtd)||1;$('modal-b').querySelector(`[data-pend="${k}"]`).textContent=Math.max(0,q-Math.min(q,Math.max(0,Math.round(n(inp.value)))));});
+  document.querySelectorAll('[data-pend-at]').forEach(c=>c.onchange=()=>c.closest('.chk').classList.toggle('on',c.checked));
 }
 function abrirEmailFabrica(e){
   const c=state.config;const tpl=c.emailModelo||CONFIG_DEFAULT.emailModelo;
   const corpo=tpl.replace(/\{(\w+)\}/g,(m,k)=>({cliente:e.cliente,fazenda:e.fazenda||'—',itens:itensResumo(e)||'—',consultor:e.consultor||'—',termino:fmtD(e.termino),numero:e.numero||'',pasta:e.pasta&&e.pasta.webUrl||'(anexos na pasta do cliente no SharePoint)'})[k]??m);
   let pre='',tag='';
-  if(e.tipoConclusao==='parcial'){const r=e.retornoId&&getRec('entregas',e.retornoId);const im=e.impossibilidade||{};tag='PARCIAL — ';pre=`ENTREGA PARCIAL\nEntregue: ${itensResumo(e)}\nPendente: ${r?itensResumo(r):'—'}\nMotivo: ${im.motivo||'—'}${im.obs?' ('+im.obs+')':''}\nPrevisão de retorno: ${fmtD(im.previsao)}\nTermo de impossibilidade de entrega anexo.\n\n`;}
-  if(e.retornoDe){const o=getRec('entregas',e.retornoDe);tag='COMPLEMENTO — ';pre=`COMPLEMENTO da entrega parcial ${o?o.numero:''}${o&&o.semPagamento&&!o.pagamento?` (a parcial ${o.numero} — ${itensResumo(o)} — ainda não foi paga e deve ser paga junto)`:''}\n\n`;}
+  if(e.tipoConclusao==='parcial'){const r=e.retornoId&&getRec('entregas',e.retornoId);const im=e.impossibilidade||{};tag='PARCIAL — ';pre=`ENTREGA PARCIAL (incompleta)\nEquipamentos: ${itensResumo(e)}\nFicou pendente: ${textoPend(e)||(r&&r.itensOriginais===undefined&&e.itensOriginais?itensResumo(r):'—')}\nMotivo: ${im.motivo||'—'}${im.obs?' ('+im.obs+')':''}\nPrevisão de retorno: ${fmtD(im.previsao)}\nTermo de impossibilidade de entrega anexo.\n\n`;}
+  if(e.retornoDe){const o=getRec('entregas',e.retornoDe);tag='COMPLEMENTO — ';pre=`COMPLEMENTO da entrega parcial ${o?o.numero:''}${textoPend(e)?' — concluído: '+textoPend(e):''}${o&&o.semPagamento&&!o.pagamento?` (a parcial ${o.numero} — ${itensResumo(o)} — ainda não foi paga e deve ser paga junto)`:''}\n\n`;}
   const assunto=`${tag}Entrega Técnica ${e.numero||''} — ${rotuloCliente(e)} — ${itensResumo(e)}`;
   const q=['subject='+encodeURIComponent(assunto),'body='+encodeURIComponent(pre+corpo)];if(c.emailCc)q.push('cc='+encodeURIComponent(c.emailCc));
   location.href='mailto:'+encodeURIComponent(c.emailPara||'').replace(/%2C/gi,',').replace(/%40/g,'@')+'?'+q.join('&');
