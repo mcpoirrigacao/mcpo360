@@ -41,6 +41,9 @@ tr.resumo .tg:hover{text-decoration:underline}
 tr.resumo .qtd{font-size:11px;font-weight:500;opacity:.65;margin-left:4px;white-space:nowrap}
 tr.resumo td.txt-resumo{font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 tr.sub td{background:#fbf9f4}
+select.sel-temp{font:inherit;font-size:12.5px;font-weight:600;padding:5px 6px;border:1px solid #d9d0bf;border-radius:6px;background:#fff}
+i.dot-temp{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:middle}
+tr.tot-temp td:first-child,#lanc-total-geral td:first-child{white-space:nowrap;min-width:150px}
 tr.sub td.sub-nome{padding-left:22px;font-size:.92em;opacity:.85}
 tr.sub-add td{padding:2px 8px 8px!important}
 tr.sub-add .btn{font-size:12px;padding:3px 10px}
@@ -520,6 +523,7 @@ function withDefaults(s){
       }
       eq.migrCli='n1'; _migrados.push(eq.id);
     }
+    if(eq.id==='pivo'&&eq.migrCli!=='n2'){ eq.campos.forEach(c=>{ if(norm(c.nome)==='NOME CLIENTE'){ c.ativo=false; c.removido=true; } }); eq.migrCli='n2'; _migrados.push(eq.id); }
     if(eq.id==='pivo'&&eq.migrSeg!=='s1'){ eq.campos.forEach(c=>{ if(['KM RODADO','CLIENTES VISITADOS'].includes(norm(c.nome))) c.segUnico=true; }); eq.migrSeg='s1'; _migrados.push(eq.id); }
     if(eq.id==='pivo'&&eq.migrGrp!=='g1'){
       const G={'CARRETEL UNIDADE':'CARRETEL','CARRETEL VALOR':'CARRETEL','PEÇAS':'PEÇAS','PEÇAS FATURADO':'PEÇAS','QTDE LANCES':'PIVÔ','VALOR PIVÔ':'PIVÔ','IRRICONTROL':'IRRICONTROL','VALOR IRRICONTROL':'IRRICONTROL'};
@@ -1158,6 +1162,73 @@ function linhaResumoHtml(eq,s,g,l,cols,soLeitura,outro){
   if(podeSub) x+=`<tr class="sub-add"><td colspan="${cols.length+1+(eq.usaRegional?1:0)}"><button class="btn ghost small" type="button" data-addsub data-l="${l.id}" data-g="${escapeHtml(g)}">+ lançamento para ${escapeHtml(l.nome)}</button></td></tr>`;
   return x;
 }
+/* ===== Pivô (Comercial): uma tabela só; cada lançamento escolhe a Temperatura (FRIO/MORNO/QUENTE).
+   Os valores continuam gravados por temperatura (mesmos registros de antes), então Painel, totais e importação não mudam. ===== */
+const TEMP_COL={id:'__temp',nome:'TEMPERATURA',tipo:'texto',grupo:''};
+const PEND_TEMP=new Set();   // lançamentos criados na tela e ainda vazios: "k|idx"
+function colsTemp(eq,cols){ const out=cols.slice(); const i=out.findIndex(c=>norm(c.nome)==='CLIENTES VISITADOS'); out.splice(i>=0?i+1:0,0,TEMP_COL); return out; }
+function cidIdx(c,idx){return idx>1?c.id+'#'+idx:c.id;}
+function lancTemTudo(eq,r,idx){ return !!(r&&r.v)&&camposAtivos(eq).some(c=>!c.segUnico&&temValor(r.v[cidIdx(c,idx)])); }
+/* lançamentos da pessoa: [{g, idx}] */
+function lancsPessoa(eq,s,l){ const out=[];
+  segs(eq).forEach(g=>{ const k=rkey(s,eq.id,l.id,g), r=state.registros[k], n=nSub(k)+1;
+    for(let idx=1;idx<=n;idx++) if(lancTemTudo(eq,r,idx)||PEND_TEMP.has(k+'|'+idx)) out.push({g,idx,k}); });
+  return out; }
+function idxLivre(eq,k){ const r=state.registros[k]; for(let i=1;;i++){ if(!lancTemTudo(eq,r,i)&&!PEND_TEMP.has(k+'|'+i)) return i; } }
+function tabelaTemperaturaHtml(eq,s,cols,ls,pode){
+  const cs=colsTemp(eq,cols), g0=segs(eq)[0];
+  let x=`<div class="card" style="padding:10px;"><div class="tablewrap"><table class="dt" data-seg="*">${theadCampos(cs,[`<th>${escapeHtml(rotuloLinhaTxt(eq))}</th>`,...(eq.usaRegional?['<th>Reg.</th>']:[])],c=>(isNum(c)?'r ':'')+(c.auto?'auto':''))}<tbody>`;
+  ls.forEach(l=>{
+    const soLeitura=!pode||!linhaEditavel(eq,l), outro=porEmail(eq)&&!isAdmin()&&l.email&&l.ativo!==false&&!minhaLinha(eq,l);
+    const lan=lancsPessoa(eq,s,l), aberta=estaAberta(eq,l,'*'), podeSub=!soLeitura;
+    const tags=`${minhaLinha(eq,l)?' <span class="pill ok">você</span>':''}${porEmail(eq)&&!linhaEditavel(eq,l)&&!outro?` <span class="pill pend">${l.email?'inativo':'histórico'}</span>`:''}`;
+    x+=`<tr class="resumo${minhaLinha(eq,l)?' minha':''}${aberta?' aberta':''}"><td class="nome"><button type="button" class="tg" data-tg="${escapeHtml(chaveAberta(eq,l,'*'))}" aria-expanded="${aberta}">${aberta?'▾':'▸'} ${escapeHtml(l.nome)}</button>${tags} <span class="qtd" data-qtdp="${l.id}">${lan.filter(a=>lancTemTudo(eq,state.registros[a.k],a.idx)).length} lanç.</span></td>${eq.usaRegional?`<td>${l.regional?`<span class="reg ${escapeHtml(l.regional)}">${escapeHtml(l.regional)}</span>`:''}</td>`:''}`;
+    cs.forEach(c=>{
+      if(c.id==='__temp'){ const cont=segs(eq).map(g=>[g,lan.filter(a=>a.g===g&&lancTemTudo(eq,state.registros[a.k],a.idx)).length]).filter(z=>z[1]); x+=`<td class="txt-resumo" data-tempres="${l.id}">${escapeHtml(cont.map(z=>z[1]+' '+z[0].toLowerCase()).join(' · '))}</td>`; return; }
+      /* KM RODADO / CLIENTES VISITADOS: um valor por pessoa na semana, digitado aqui na linha da pessoa */
+      if(c.segUnico&&!c.auto&&podeSub){ const vv=valorArmazenado(s,eq,l.id,g0,c); x+=`<td><input type="text" class="num-in" inputmode="decimal" autocomplete="off" data-l="${l.id}" data-g="${escapeHtml(g0)}" data-c="${c.id}" value="${escapeHtml(numParaTexto(c,temValor(vv)?vv:''))}"></td>`; return; }
+      x+=`<td class="num ${c.auto?'auto':''}" data-rs-l="${l.id}" data-rs-g="*" data-rs-c="${c.id}">${isNum(c)?fmt(c,totalSemana(eq,s,c,{linhaId:l.id})):''}</td>`;
+    });
+    x+=`</tr>`;
+    if(!aberta) return;
+    lan.forEach((a,i)=>{
+      const r=state.registros[a.k];
+      x+=`<tr class="sub"><td class="nome sub-nome">Lançamento ${i+1}${podeSub?` <button class="btn icon danger" type="button" data-rmtemp="${escapeHtml(a.k)}" data-idx="${a.idx}" title="Apagar este lançamento">×</button>`:''}</td>${eq.usaRegional?'<td></td>':''}`;
+      cs.forEach(c=>{
+        if(c.id==='__temp'){ x+=podeSub?`<td><select class="sel-temp" data-movetemp="${escapeHtml(a.k)}" data-idx="${a.idx}" data-l="${l.id}">${segs(eq).map(g=>`<option ${g===a.g?'selected':''}>${escapeHtml(g)}</option>`).join('')}</select></td>`:`<td>${escapeHtml(a.g)}</td>`; return; }
+        if(c.segUnico||c.auto){ x+=`<td class="bloq">—</td>`; return; }
+        const vv=r&&r.v?r.v[cidIdx(c,a.idx)]:undefined, val=temValor(vv)?vv:'';
+        const da=`data-l="${l.id}" data-g="${escapeHtml(a.g)}" data-c="${c.id}"${a.idx>1?` data-i="${a.idx}"`:''}`;
+        if(!podeSub){ x+=`<td class="${isNum(c)?'num':''}">${isNum(c)?fmt(c,vv):escapeHtml(val)}</td>`; return; }
+        if(c.tipo==='lista') x+=`<td><select ${da}><option value=""></option>${c.opcoes.map(o=>`<option ${String(val)===o?'selected':''}>${escapeHtml(o)}</option>`).join('')}</select></td>`;
+        else if(c.tipo==='texto') x+=`<td><input type="text" ${da} value="${escapeHtml(val)}"></td>`;
+        else x+=`<td><input type="text" class="num-in" inputmode="decimal" autocomplete="off" ${da} value="${escapeHtml(numParaTexto(c,val))}"${c.tipo==='percentual'?' placeholder="%"':c.tipo==='moeda'?' placeholder="R$"':''}></td>`;
+      });
+      x+=`</tr>`;
+    });
+    if(podeSub) x+=`<tr class="sub-add"><td colspan="${cs.length+1+(eq.usaRegional?1:0)}"><button class="btn ghost small" type="button" data-addtemp data-l="${l.id}">+ lançamento para ${escapeHtml(l.nome)}</button></td></tr>`;
+  });
+  x+=`</tbody></table></div></div>`;
+  /* totais por temperatura + total geral */
+  const nums=camposNum(eq);
+  x+=`<div class="card" style="padding:10px;"><div class="tablewrap"><table class="dt">${theadCampos(nums,['<th>TOTAIS DA SEMANA</th>'])}<tbody>`;
+  segs(eq).forEach((g,gi)=>{ x+=`<tr class="total-row tot-temp" data-total="${escapeHtml(g)}"><td><i class="dot-temp" style="background:${SEG_CORES[gi%5]}"></i>TOTAL ${escapeHtml(g)}</td>${nums.map(c=>`<td class="num" data-tc="${c.id}">${bloqueadoNoSeg(eq,c,g)?'—':fmt(c,totalSemana(eq,s,c,{seg:g}))}</td>`).join('')}</tr>`; });
+  x+=`<tr class="total-row" id="lanc-total-geral"><td>TOTAL GERAL</td>${nums.map(c=>`<td class="num" data-tc="${c.id}">${fmt(c,totalSemana(eq,s,c))}</td>`).join('')}</tr></tbody></table></div></div>`;
+  return x;
+}
+function moverLancamento(eq,s,k,idx,g2){
+  const r=state.registros[k]; if(!r) { PEND_TEMP.delete(k+'|'+idx); return; }
+  const k2=rkey(s,eq.id,r.l,g2); if(k2===k) return;
+  const r2=state.registros[k2]||(state.registros[k2]={s,e:eq.id,l:r.l,g:g2,v:{}});
+  const idx2=idxLivre(eq,k2); let algum=false;
+  camposAtivos(eq).concat(eq.campos.filter(c=>!c.ativo||c.removido)).forEach(c=>{ if(c.segUnico) return; const de=cidIdx(c,idx), para=cidIdx(c,idx2);
+    if(r.v[de]!==undefined){ r2.v[para]=r.v[de]; delete r.v[de]; marcarReg(k,de); marcarReg(k2,para); algum=true; } });
+  const t=new Date().toISOString(), u=emailAtual()||'local'; r.u=u; r.t=t; r2.u=u; r2.t=t;
+  if(!Object.keys(r.v).length) delete state.registros[k]; if(!Object.keys(r2.v).length) delete state.registros[k2];
+  PEND_TEMP.delete(k+'|'+idx); if(!algum) PEND_TEMP.add(k2+'|'+idx2);
+  SUBLOCAL[k2]=Math.max(SUBLOCAL[k2]||1, idx2);
+  save();
+}
 function renderLanc(){
   const vis=equipesVisiveis();
   if(!lancEquipe||!vis.find(e=>e.id===lancEquipe)) lancEquipe=(vis.find(podeEditar)||vis[0]||{}).id||null;
@@ -1175,7 +1246,9 @@ function renderLanc(){
   }
   if(!cols.length){ body.innerHTML=html+'<div class="empty">Esta equipe ainda não tem campos. Um administrador pode criá-los em Equipes &amp; Campos.</div>'; return; }
   if(!ls.length){ html+=`<div class="empty">Nenhuma ${escapeHtml((eq.rotuloLinha||'linha').toLowerCase())} cadastrada.</div>`; }
-  segs(eq).forEach((g,gi)=>{
+  const modoTemp=eq.id==='pivo'&&eq.tipo==='manual'&&segs(eq).length>1;
+  if(modoTemp) html+=tabelaTemperaturaHtml(eq,s,cols,ls,pode);
+  if(!modoTemp) segs(eq).forEach((g,gi)=>{
     if(g) html+=`<div class="seg-title"><i style="background:${SEG_CORES[gi%5]}"></i>${escapeHtml(g)}</div>`;
     html+=`<div class="card" style="padding:10px;"><div class="tablewrap"><table class="dt" data-seg="${escapeHtml(g)}">${theadCampos(cols,[`<th>${escapeHtml(rotuloLinhaTxt(eq))}</th>`,...(eq.usaRegional?['<th>Reg.</th>']:[])],c=>(isNum(c)?'r ':'')+(c.auto?'auto':''))}<tbody>`;
     ls.forEach(l=>{
@@ -1217,7 +1290,7 @@ function renderLanc(){
     });
     html+=`<tr class="total-row" data-total="${escapeHtml(g)}"><td>TOTAL${g?' '+escapeHtml(g):''}</td>${eq.usaRegional?'<td></td>':''}${cols.map(c=>`<td class="num" data-tc="${c.id}">${isNum(c)?fmt(c,totalSemana(eq,s,c,{seg:g})):''}</td>`).join('')}</tr></tbody></table></div></div>`;
   });
-  if(segs(eq).length>1){
+  if(!modoTemp&&segs(eq).length>1){
     const nums=camposNum(eq);
     html+=`<div class="card" style="padding:10px;"><div class="tablewrap"><table class="dt">${theadCampos(nums,['<th>TOTAL GERAL</th>'])}<tbody><tr class="total-row" id="lanc-total-geral"><td>Todas</td>${nums.map(c=>`<td class="num" data-tc="${c.id}">${fmt(c,totalSemana(eq,s,c))}</td>`).join('')}</tr></tbody></table></div></div>`;
   }
@@ -1242,11 +1315,23 @@ function renderLanc(){
       if(v===''||v===null) delete r.v[cid]; else r.v[cid]=v;
       r.u=emailAtual()||'local'; r.t=new Date().toISOString();
       if(Object.keys(r.v).length) state.registros[k]=r; else delete state.registros[k];
-      marcarReg(k,cid); save(); atualizarTotaisLanc(eq);
+      marcarReg(k,cid); PEND_TEMP.delete(k+'|'+(inp.dataset.i||1)); save(); atualizarTotaisLanc(eq);
     };
     if(inp.classList.contains('num-in')){ const c0=eq.campos.find(x=>x.id===inp.dataset.c); inp.addEventListener('input',()=>mascararNumero(inp,c0)); inp.addEventListener('focus',()=>inp.select()); }
     inp.addEventListener('change',handler);
     if(inp.tagName==='INPUT') inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); handler(); moverFoco(inp,e.shiftKey?-1:1); } });
+  });
+  body.querySelectorAll('[data-addtemp]').forEach(b=>b.onclick=()=>{
+    const g0=segs(eq)[0], k=rkey(s,eq.id,b.dataset.l,g0), idx=idxLivre(eq,k); PEND_TEMP.add(k+'|'+idx); SUBLOCAL[k]=Math.max(SUBLOCAL[k]||1,idx);
+    ABERTOS.add(eq.id+'|'+b.dataset.l+'|*'); FECHADOS.delete(eq.id+'|'+b.dataset.l+'|*'); renderLanc();
+    const sel=Array.from(document.querySelectorAll('#lanc-body select[data-movetemp]')).filter(x=>x.dataset.l===b.dataset.l).pop(); if(sel) sel.focus();
+  });
+  body.querySelectorAll('select[data-movetemp]').forEach(sel=>sel.onchange=()=>{ moverLancamento(eq,s,sel.dataset.movetemp,+sel.dataset.idx,sel.value); renderLanc(); });
+  body.querySelectorAll('[data-rmtemp]').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.rmtemp, idx=+b.dataset.idx, r=state.registros[k];
+    if(r&&lancTemTudo(eq,r,idx)&&!confirm('Apagar este lançamento?')) return;
+    if(r){ eq.campos.forEach(c=>{ if(c.segUnico) return; const cid=cidIdx(c,idx); if(r.v[cid]!==undefined){ delete r.v[cid]; marcarReg(k,cid); } }); r.u=emailAtual()||'local'; r.t=new Date().toISOString(); if(!Object.keys(r.v).length) delete state.registros[k]; save(); }
+    PEND_TEMP.delete(k+'|'+idx); renderLanc();
   });
   body.querySelectorAll('[data-addsub]').forEach(b=>b.onclick=()=>{
     const k=rkey(s,eq.id,b.dataset.l,b.dataset.g); const novo=nSub(k)+2; SUBLOCAL[k]=novo; ABERTOS.add(eq.id+'|'+b.dataset.l+'|'+b.dataset.g); renderLanc();
@@ -1288,7 +1373,9 @@ function moverFoco(inp,dir){ // Enter desce para a mesma coluna na próxima linh
 function atualizarTotaisLanc(eq){
   const s=semanaRef;
   document.querySelectorAll('#lanc-body [data-rs-c]').forEach(td=>{ const c=eq.campos.find(x=>x.id===td.dataset.rsC); const l={id:td.dataset.rsL}; if(!c) return;
-    if(isNum(c)) td.textContent=stripHtml(fmt(c,valor(s,eq,l.id,td.dataset.rsG,c))); else { const t=textoResumo(eq,s,l,td.dataset.rsG,c); td.textContent=t; td.title=t; } });
+    if(isNum(c)) td.textContent=stripHtml(fmt(c,td.dataset.rsG==='*'?totalSemana(eq,s,c,{linhaId:l.id}):valor(s,eq,l.id,td.dataset.rsG,c))); else { const t=textoResumo(eq,s,l,td.dataset.rsG,c); td.textContent=t; td.title=t; } });
+  document.querySelectorAll('#lanc-body [data-qtdp]').forEach(sp=>{ const l={id:sp.dataset.qtdp}; const lan=lancsPessoa(eq,s,l).filter(a=>lancTemTudo(eq,state.registros[a.k],a.idx)); sp.textContent=lan.length+' lanç.';
+    const td=document.querySelector(`#lanc-body [data-tempres="${l.id}"]`); if(td) td.textContent=segs(eq).map(g=>[g,lan.filter(a=>a.g===g).length]).filter(z=>z[1]).map(z=>z[1]+' '+z[0].toLowerCase()).join(' · '); });
   document.querySelectorAll('#lanc-body [data-qtd]').forEach(sp=>{ const k=sp.dataset.qtd; sp.textContent=qtdLanc(state.registros[k],nSub(k)+1,camposAtivos(eq))+' lanç.'; });
   document.querySelectorAll('#lanc-body tr[data-total]').forEach(tr=>{ const g=tr.dataset.total; tr.querySelectorAll('[data-tc]').forEach(td=>{const c=eq.campos.find(x=>x.id===td.dataset.tc); if(c&&isNum(c)) td.textContent=stripHtml(fmt(c,totalSemana(eq,s,c,{seg:g})));}); });
   const tg=document.getElementById('lanc-total-geral'); if(tg) tg.querySelectorAll('[data-tc]').forEach(td=>{const c=eq.campos.find(x=>x.id===td.dataset.tc); if(c) td.textContent=stripHtml(fmt(c,totalSemana(eq,s,c)));});
