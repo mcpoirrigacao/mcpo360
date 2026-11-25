@@ -200,7 +200,7 @@ body:not([data-mod="cli"]) .so-cli{display:none !important;}
 .lbl-sec{font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;color:var(--texto-suave);font-weight:700;margin:14px 0 6px;}
 /* ---- Entrega Técnica ---- */
 main.largo{max-width:1500px;}
-.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:14px;}
+.kpis{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;margin-bottom:14px;}
 @media (max-width:1000px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr));}}
 @media (max-width:560px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr));}}
 .kpi{background:#fff;border:1px solid var(--borda);border-top:4px solid var(--cinza);border-radius:var(--raio);padding:10px 12px;cursor:pointer;text-align:left;font-family:var(--fonte-corpo);color:var(--texto);}
@@ -324,6 +324,10 @@ body:not(.pode-editar) .so-editor{display:none !important;}
 .pbar i{display:block;height:100%;}.pbar .pg{background:var(--ok);}.pbar .an{background:var(--amarelo);}
 tr.grp td{background:#f5f1e8;font-size:.8rem;}tr.grp a{color:var(--azul);text-decoration:none;margin-left:6px;}
 tr.grp .pbar{max-width:320px;margin-top:5px;}
+.kpi.k-retorno{border-top-color:var(--ferrugem);}.kpi.k-retorno .v{color:var(--ferrugem);}
+.bdg.retorno{background:#f3e6de;color:var(--ferrugem);}.bdg.parcial{background:#fbf2d3;color:#8a6a07;}.bdg.aguardaret{background:#e8eef5;color:#2d4f73;}
+.lt.st-aguardaret{border-left-color:#2d4f73;background:#f1f5fa;}
+.tipo-conc{display:flex;gap:8px;flex-wrap:wrap;}
 </style>
 </head>
 <body>
@@ -427,6 +431,7 @@ tr.grp .pbar{max-width:320px;margin-top:5px;}
       <div class="card"><h3>Por consultor <span class="h3-side">entregas no período</span></h3><div id="p-consultor-bars"></div></div>
       <div class="card"><h3>Equipamentos entregues <span class="h3-side">quantidade</span></h3><div id="p-itens"></div></div>
     </div>
+    <div class="card" style="margin-top:16px;"><h3>Motivos de impossibilidade de entrega <span class="h3-side">parciais e sem entrega</span></h3><div id="p-motivos"></div></div>
   </section>
 
   <!-- ============ PRAZOS ============ -->
@@ -445,6 +450,7 @@ tr.grp .pbar{max-width:320px;margin-top:5px;}
       <div class="card"><h3>Consultores</h3>
         <p class="muted" style="margin:0 0 8px;">Vêm da <b>Central de acessos</b>: e-mails liberados na Entrega Técnica como Admin ou Consultor. O nome é o que vem antes do @ (ex.: lucas.xavier@… → Lucas Xavier).</p><div id="pr-consultores-lista"></div>
         <div class="field" style="margin-top:10px;"><label for="pr-tipos">Tipos de equipamento (um por linha)</label><textarea id="pr-tipos" rows="7"></textarea></div>
+        <div class="field" style="margin-top:10px;"><label for="pr-motivos">Motivos de impossibilidade de entrega (um por linha)</label><textarea id="pr-motivos" rows="6"></textarea></div>
       </div>
       <div class="card"><h3>Prazos de cada etapa (dias)</h3>
         <div class="grid" id="pr-prazos"></div>
@@ -531,14 +537,15 @@ const ETAPAS=[
 ];
 const ETAPA=Object.fromEntries(ETAPAS.map((e,i)=>[e.id,Object.assign({i},e)]));
 const ABERTAS=['pendente','andamento','envio','fabrica','pagamento'];
-const PRAZO_INFO={atrasada:'Atrasada',atencao:'Atenção',noprazo:'No prazo',semprev:'Sem previsão',concluida:'Concluída',agendada:'Agendada'};
-const TIPOS_ANEXO=[{v:'termo',l:'Termo de ET assinado'},{v:'garantia',l:'Termo de garantia'},{v:'fotos',l:'Fotos'},{v:'fabrica',l:'E-mail / aprovação da fábrica'},{v:'pagamento',l:'Comprovante / NF'},{v:'outro',l:'Outro'}];
+const PRAZO_INFO={atrasada:'Atrasada',atencao:'Atenção',noprazo:'No prazo',semprev:'Sem previsão',concluida:'Concluída',agendada:'Agendada',aguardaret:'Aguarda retorno'};
+const TIPOS_ANEXO=[{v:'termo',l:'Termo de ET assinado'},{v:'garantia',l:'Termo de garantia'},{v:'impossibilidade',l:'Termo de impossibilidade'},{v:'fotos',l:'Fotos'},{v:'fabrica',l:'E-mail / aprovação da fábrica'},{v:'pagamento',l:'Comprovante / NF'},{v:'outro',l:'Outro'}];
 const TIPO_ANEXO=Object.fromEntries(TIPOS_ANEXO.map(t=>[t.v,t.l]));
 
 const CONFIG_DEFAULT={
   consultores:[{nome:'Karlos Manoel',cargo:'Consultor Técnico de Manejo',email:''},{nome:'Lucas Xavier',cargo:'Consultor Técnico de Manejo',email:''},{nome:'Rejane Falcão',cargo:'Coordenadora de Manejo',email:''}],
   tipos:['Pivô completo','Pivô parte aérea','Pivô parcial','Bombeamento','Carretel','Telemetria (Nexus)','Repetidora','Central','Outro'],
-  prazos:{pendente:15,andamento:10,envio:7,fabrica:15,pagamento:30},
+  prazos:{pendente:15,andamento:10,envio:7,fabrica:15,pagamento:30,retorno:3},
+  motivosImpossibilidade:['Sem energia','Área ou base não liberada','Falta de material','Cliente ausente','Clima / chuva','Outro'],
   atencaoPct:75,
   emailPara:'',emailCc:'',
   emailModelo:'Prezados,\n\nSegue a entrega técnica {numero} para aprovação.\n\nCliente: {cliente}\nFazenda: {fazenda}\nEquipamentos: {itens}\nConsultor: {consultor}\nConcluída em campo: {termino}\n\nDocumentos: {pasta}\n\nAtenciosamente,\nMCPO Irrigação',
@@ -578,7 +585,7 @@ function etapa(e){
 }
 function refData(e,et){
   et=et||etapa(e);
-  if(et==='pendente')return e.dataConclusaoObra||(e.criadoEm&&!e.importado?e.criadoEm.slice(0,10):'');
+  if(et==='pendente')return e.previsaoRetorno||e.dataConclusaoObra||(e.criadoEm&&!e.importado?e.criadoEm.slice(0,10):'');
   if(et==='andamento')return e.inicio;
   if(et==='envio')return e.termino;
   if(et==='fabrica')return e.emailFabrica;
@@ -588,14 +595,28 @@ function refData(e,et){
 function prazo(e){
   const et=etapa(e);const ref=refData(e,et);
   if(et==='paga')return {st:'concluida',dias:null,lim:null,ref,et};
+  if(et==='pagamento'&&e.semPagamento)return {st:'aguardaret',dias:difDias(e.semPagamento.em,hojeISO()),lim:null,ref:e.semPagamento.em,et};
   if(!ref)return {st:'semprev',dias:null,lim:null,ref:null,et};
-  const dias=difDias(ref,hojeISO());const lim=nNum(state.config.prazos[et])||0;
+  const dias=difDias(ref,hojeISO());
+  if(et==='pendente'&&e.previsaoRetorno){const lr=Math.max(0,nNum(state.config.prazos.retorno));if(dias<0)return {st:'agendada',dias,lim:lr,ref,et};return {st:dias>lr?'atrasada':(dias>=lr*(nNum(state.config.atencaoPct)||75)/100?'atencao':'noprazo'),dias,lim:lr,ref,et};}
+  const lim=nNum(state.config.prazos[et])||0;
   if(dias<0)return {st:'agendada',dias,lim,ref,et};
   let st='noprazo';
   if(lim&&dias>lim)st='atrasada';else if(lim&&dias>=lim*(nNum(state.config.atencaoPct)||75)/100)st='atencao';
   return {st,dias,lim,ref,et};
 }
 function divAtiva(e){return !!(e.divergencia&&e.divergencia.ativa);}
+/* ---- entrega parcial / retorno ----
+   tipoConclusao: 'total' | 'parcial'. Parcial: itens = entregues, itensOriginais = antes da divisão,
+   impossibilidade {motivo,previsao,assinante,obs,data}, retornoId = lote criado com o pendente.
+   Retorno: retornoDe = lote de origem, previsaoRetorno. Nada entregue: aguardandoRetorno + previsaoRetorno.
+   semPagamento: fábrica não pagou a parcial → cobrada junto com o pagamento do retorno. */
+function ehRetorno(e){return !!(e.retornoDe||e.aguardandoRetorno);}
+function retornoAberto(e){return ehRetorno(e)&&(etapa(e)==='pendente'||etapa(e)==='andamento');}
+function faltaImp(e){return (e.tipoConclusao==='parcial'||e.aguardandoRetorno)&&!(e.anexos||[]).some(a=>a.tipo==='impossibilidade');}
+function numeroDe(id){const x=id&&getRec('entregas',id);return x?(x.numero||'lote'):'';}
+function bdgsExtra(e){const b=[];if(e.retornoDe)b.push(`<span class="bdg retorno">↩ Retorno de ${esc(numeroDe(e.retornoDe))}</span>`);else if(e.aguardandoRetorno)b.push('<span class="bdg retorno">↩ Aguardando retorno</span>');if(e.tipoConclusao==='parcial')b.push('<span class="bdg parcial">Parcial</span>');if(e.semPagamento&&!e.pagamento)b.push('<span class="bdg aguardaret">Cobra no retorno</span>');if(faltaImp(e))b.push('<span class="bdg div">Falta termo de impossibilidade</span>');return b.join('');}
+function tagsCurtas(e){const t=[];if(ehRetorno(e))t.push('retorno'+(e.previsaoRetorno&&etapa(e)==='pendente'?' prev. '+fmtDc(e.previsaoRetorno):''));if(e.tipoConclusao==='parcial')t.push('parcial');if(e.semPagamento&&!e.pagamento)t.push('cobra no retorno');if(faltaImp(e))t.push('falta termo impossib.');return t.length?t.join(' · ')+' · ':'';}
 function itensDe(e){return Array.isArray(e.itens)?e.itens.filter(i=>i&&(i.tipo||i.obs)):[];}
 const CURTO={'Pivô completo':'PC completo','Pivô parte aérea':'PC parte aérea','Pivô parcial':'PC parcial','Telemetria (Nexus)':'Nexus','Repetidora':'Repetidoras','Bombeamento':'Bombeamento','Carretel':'Carretel','Central':'Central'};
 function itemTxt(i){const q=nNum(i.qtd)||1;let t=CURTO[i.tipo]||i.tipo||'';if(i.tipo==='Bombeamento'&&q>1)t='Bombeamentos';if(i.tipo==='Carretel'&&q>1)t='Carretéis';if(i.tipo==='Outro'||!i.tipo)t=i.obs||'Outro';else if(i.obs)t+=' '+i.obs;return (q+' '+t).trim();}
@@ -660,7 +681,7 @@ function obraPorId(id){return OBRAS.find(o=>o.obraId===id)||null;}
    Total de pivôs = campo "Pivôs" da obra; pode ser ajustado por grupo (state.grupos[key].totalPivos). */
 function grupoKey(e){if(e.obraId)return 'obra:'+e.obraId;if(e.grupoId)return e.grupoId;return 'cf:'+chave(e.cliente)+'|'+chave(e.fazenda);}
 function dataLote(e){return e.inicio||e.termino||e.emailFabrica||e.aprovacao||e.pagamento||(e.criadoEm||'').slice(0,10)||'9999';}
-const ORD_ST={atrasada:0,atencao:1,semprev:2,noprazo:3,agendada:3,concluida:4};
+const ORD_ST={atrasada:0,atencao:1,semprev:2,noprazo:3,agendada:3,aguardaret:3,concluida:4};
 let LOTE={};
 function montarGrupos(){
   const G=new Map();LOTE={};
@@ -677,6 +698,7 @@ function montarGrupos(){
     g.total=temOv?nNum(ov.totalPivos):(totObra||g.feitos);
     g.totalOrigem=temOv?'manual':(totObra?'obra':'lotes');g.totalObra=totObra;
     g.saldo=Math.max(0,g.total-g.feitos);
+    g.retPend=g.lotes.filter(retornoAberto).reduce((a,e)=>a+pivos(e),0);
     g.abertos=g.lotes.filter(e=>ABERTAS.includes(etapa(e)));
     g.div=g.abertos.some(divAtiva);
     g.pior=g.abertos.map(e=>prazo(e).st).sort((a,b)=>(ORD_ST[a]??5)-(ORD_ST[b]??5))[0]||(g.virtual?prazo(g.virtual).st:(g.lotes.length?'concluida':'semprev'));
@@ -736,7 +758,8 @@ function filtradasQuadro(){
       if(['atrasada','atencao','semprev'].includes(FILTRO_KPI)&&pr.st!==FILTRO_KPI)return false;
       if(FILTRO_KPI==='noprazo'&&pr.st!=='noprazo'&&pr.st!=='agendada')return false;
       if(FILTRO_KPI==='div'&&!divAtiva(e))return false;
-      if(FILTRO_KPI==='paga'&&pr.et!=='paga')return false;}
+      if(FILTRO_KPI==='paga'&&pr.et!=='paga')return false;
+      if(FILTRO_KPI==='retorno'&&!retornoAberto(e))return false;}
     return true;
   });
 }
@@ -759,7 +782,7 @@ function cardHtml(e){
   const acao=ETAPA[et].acao;const nAnx=(e.anexos||[]).length;
   const sub=[e.obra||e.fazenda,rotuloLote(e),itensResumo(e)].filter(Boolean).join(' · ');
   return `<div class="etc p-${pr.st}${div?' div':''}${e.virtual?' virtual':''}" data-card="${esc(e.id)}">
-    <div class="bdgs">${bdgPrazo(pr)}${div?'<span class="bdg div">Divergência</span>':''}${e.virtual||e.obraId?'<span class="bdg montagem">Montagem</span>':''}</div>
+    <div class="bdgs">${bdgPrazo(pr)}${div?'<span class="bdg div">Divergência</span>':''}${bdgsExtra(e)}${e.virtual||e.obraId?'<span class="bdg montagem">Montagem</span>':''}</div>
     <div class="tt">${esc(e.cliente)}</div>
     ${sub?`<div class="sb">${esc(sub)}</div>`:''}
     <div class="sb">${e.consultor?'👤 '+esc(e.consultor):'<span style="color:var(--ferrugem)">sem consultor</span>'}${e.numero?' · '+esc(e.numero):''}${e.virtual&&e.dataConclusaoObra?' · obra concluída '+fmtDc(e.dataConclusaoObra):''}</div>
@@ -784,7 +807,8 @@ function renderKpis(){
   const mes=hojeISO().slice(0,7);
   const pagasMes=pr.filter(x=>x.p.et==='paga'&&(x.e.pagamento||'').slice(0,7)===mes).length;
   const div=ab.filter(x=>divAtiva(x.e)).length;
-  const K=[['aberto','Em aberto',ab.length,'ainda não pagas'],['atrasada','Atrasadas',c('atrasada'),'passaram do prazo'],['atencao','Atenção',c('atencao'),'perto do prazo'],['noprazo','No prazo',c('noprazo')+c('agendada'),'andando bem'],['div','Divergência',div,'precisam de correção'],['paga','Pagas no mês',pagasMes,MESES[new Date().getMonth()]+'/'+new Date().getFullYear()]];
+  const ret=ab.filter(x=>retornoAberto(x.e)).length;
+  const K=[['aberto','Em aberto',ab.length,'ainda não pagas'],['atrasada','Atrasadas',c('atrasada'),'passaram do prazo'],['atencao','Atenção',c('atencao'),'perto do prazo'],['noprazo','No prazo',c('noprazo')+c('agendada'),'andando bem'],['div','Divergência',div,'precisam de correção'],['retorno','Retornos',ret,'voltar à obra'],['paga','Pagas no mês',pagasMes,MESES[new Date().getMonth()]+'/'+new Date().getFullYear()]];
   $('kpis').innerHTML=K.map(k=>`<button type="button" class="kpi k-${k[0]}${FILTRO_KPI===k[0]?' on':''}" data-kpi="${k[0]}"><div class="l">${k[1]}</div><div class="v">${k[2]}</div><div class="s">${k[3]}</div></button>`).join('');
   $('kpis').querySelectorAll('[data-kpi]').forEach(b=>b.onclick=()=>{FILTRO_KPI=FILTRO_KPI===b.dataset.kpi?'':b.dataset.kpi;renderQuadro();});
   const fab=ab.filter(x=>x.p.et==='fabrica').length,pag=ab.filter(x=>x.p.et==='pagamento').length,pend=ab.filter(x=>x.p.et==='pendente').length;
@@ -822,7 +846,7 @@ function renderQuadro(){
 const CLI_FECHADO=new Set(),CLI_ABERTO_R=new Set();
 function bdgSt(st){return `<span class="bdg ${st}">${PRAZO_INFO[st]||st}</span>`;}
 function barraPivos(g){if(!g.total)return '';const p=v=>Math.min(100,v/g.total*100);return `<div class="pbar" title="${g.pagos} pago(s) · ${g.feitos-g.pagos} em andamento · ${g.saldo} sem ET"><i class="pg" style="width:${p(g.pagos)}%"></i><i class="an" style="width:${p(g.feitos-g.pagos)}%"></i></div>`;}
-function textoPivos(g){if(!g.total&&!g.feitos)return 'sem pivôs informados';return `${g.feitos} de ${g.total} pivô(s) com ET${g.totalOrigem==='manual'?' <span class="muted">(ajustado)</span>':g.totalOrigem==='lotes'?' <span class="muted">(soma dos lotes)</span>':''}`;}
+function textoPivos(g){if(!g.total&&!g.feitos)return 'sem pivôs informados';return `${g.feitos-g.retPend} de ${g.total} pivô(s) entregues${g.retPend?` · <b style="color:var(--ferrugem)">${g.retPend} aguardando retorno</b>`:''}${g.totalOrigem==='manual'?' <span class="muted">(ajustado)</span>':g.totalOrigem==='lotes'?' <span class="muted">(soma dos lotes)</span>':''}`;}
 function renderRaias(lista){
   const G=montarGrupos();const ids=new Set(lista.map(e=>e.id));
   const filtro=!!($('q-busca').value||$('q-consultor').value||$('q-prazo').value||FILTRO_KPI);
@@ -840,8 +864,8 @@ function renderRaias(lista){
     return Object.assign(c,{ab,pior,div:c.grupos.some(g=>g.div),atr:c.grupos.reduce((a,g)=>a+g.abertos.filter(e=>prazo(e).st==='atrasada').length,0),tot:c.grupos.reduce((a,g)=>a+g.total,0),feitos:c.grupos.reduce((a,g)=>a+g.feitos,0),pagos:c.grupos.reduce((a,g)=>a+g.pagos,0),lotes:c.grupos.reduce((a,g)=>a+g.lotes.length,0)});})
     .sort((a,b)=>(ORD_ST[a.pior]??5)-(ORD_ST[b.pior]??5)||b.atr-a.atr||b.ab-a.ab||a.nome.localeCompare(b.nome,'pt-BR'));
   const cab=`<div class="rz-h"><div>Cliente / obra</div>${ETAPAS.map((et,i)=>`<div><span class="n">${i+1}</span>${esc(et.nome)}</div>`).join('')}</div>`;
-  const chip=e=>{const pr=prazo(e);const st=divAtiva(e)?'div':pr.st;const l=LOTE[e.id];
-    return `<button type="button" class="lt st-${st}" data-abrir="${esc(e.id)}" title="${esc((e.numero||'')+' · '+itensResumo(e)+(e.consultor?' · '+e.consultor:''))}"><b>${l?'Lote '+l.n:'Lote'}</b> · ${esc(itensResumo(e)||'—')}<small>${pr.et==='paga'?'paga '+fmtDc(e.pagamento):pr.dias==null?'sem data':pr.dias<0?'começa em '+(-pr.dias)+'d':pr.dias+'d'+(divAtiva(e)?' · divergência':'')}${e.consultor?' · '+esc(e.consultor.split(' ')[0]):''}</small></button>`;};
+  const chip=e=>{const pr=prazo(e);const st=divAtiva(e)||faltaImp(e)?'div':pr.st;const l=LOTE[e.id];
+    return `<button type="button" class="lt st-${st}" data-abrir="${esc(e.id)}" title="${esc((e.numero||'')+' · '+itensResumo(e)+(e.consultor?' · '+e.consultor:''))}"><b>${ehRetorno(e)?'↩ ':''}${l?'Lote '+l.n:'Lote'}</b> · ${esc(itensResumo(e)||'—')}<small>${esc(tagsCurtas(e))}${pr.et==='paga'?'paga '+fmtDc(e.pagamento):pr.dias==null?'sem data':pr.dias<0?'começa em '+(-pr.dias)+'d':pr.dias+'d'+(divAtiva(e)?' · divergência':'')}${e.consultor?' · '+esc(e.consultor.split(' ')[0]):''}</small></button>`;};
   const linhas=C.map(c=>{
     const aberto=c.ab?!CLI_FECHADO.has(c.k):CLI_ABERTO_R.has(c.k)||!!$('q-busca').value;
     const head=`<div class="rz-cli${aberto?' on':''}" data-cli="${esc(c.k)}"><span class="tg">${aberto?'▾':'▸'}</span><b>${esc(c.nome)}</b><span class="muted">${c.grupos.length} obra(s) · ${c.lotes} lote(s)${c.tot?` · ${c.feitos} de ${c.tot} pivôs`:''}</span>${c.ab?(c.atr?'':bdgSt(c.pior)):'<span class="bdg concluida">tudo pago</span>'}${c.atr?`<span class="bdg atrasada">${c.atr} atrasado(s)</span>`:''}${c.div?'<span class="bdg div">Divergência</span>':''}</div>`;
@@ -887,7 +911,7 @@ function renderLista(lista){
   chips.querySelectorAll('[data-et]').forEach(b=>b.onclick=()=>{FILTRO_ETAPA=b.dataset.et;renderQuadro();});
   let L=lista;if(FILTRO_ETAPA==='div')L=L.filter(divAtiva);else if(FILTRO_ETAPA)L=L.filter(e=>etapa(e)===FILTRO_ETAPA);
   L=L.slice().sort((a,b)=>ETAPA[etapa(a)].i-ETAPA[etapa(b)].i||ordenarPorParada(a,b));
-  $('quadro').innerHTML=`<div class="card"><div class="tablewrap"><table class="dt" style="min-width:1050px;"><thead><tr><th>Nº</th><th>Cliente / fazenda</th><th>Obra / lote</th><th>Equipamentos</th><th>Consultor</th><th>Etapa</th><th>Prazo</th><th class="r">Dias</th><th>Desde</th><th class="c">📎</th><th></th></tr></thead><tbody>${L.map(e=>{const pr=prazo(e);return `<tr class="click" data-abrir="${esc(e.id)}"><td class="nw">${esc(e.numero||'—')}</td><td><b>${esc(e.cliente)}</b>${e.fazenda?'<br><span class="muted">'+esc(e.fazenda)+'</span>':''}</td><td>${esc(e.obra||'')}${e.obra?'<br>':''}<span class="muted">${esc(rotuloLote(e))}</span></td><td>${esc(itensResumo(e))}</td><td>${esc(e.consultor||'—')}</td><td>${bdgEtapa(pr.et)}${divAtiva(e)?' <span class="bdg div">Divergência</span>':''}</td><td>${bdgPrazo(pr)}</td><td class="num">${pr.dias==null?'—':pr.dias}</td><td class="nw">${fmtD(pr.ref)}</td><td class="c">${(e.anexos||[]).length||''}</td><td>${ETAPA[pr.et].acao?`<button class="acao-btn so-editor" type="button" data-acao="${esc(e.id)}">${e.virtual?'Iniciar ET':esc(ETAPA[pr.et].acao)}</button>`:''}</td></tr>`;}).join('')||'<tr><td colspan="11" class="empty">Nenhuma entrega com esses filtros.</td></tr>'}</tbody></table></div></div>`;
+  $('quadro').innerHTML=`<div class="card"><div class="tablewrap"><table class="dt" style="min-width:1050px;"><thead><tr><th>Nº</th><th>Cliente / fazenda</th><th>Obra / lote</th><th>Equipamentos</th><th>Consultor</th><th>Etapa</th><th>Prazo</th><th class="r">Dias</th><th>Desde</th><th class="c">📎</th><th></th></tr></thead><tbody>${L.map(e=>{const pr=prazo(e);return `<tr class="click" data-abrir="${esc(e.id)}"><td class="nw">${esc(e.numero||'—')}</td><td><b>${esc(e.cliente)}</b>${e.fazenda?'<br><span class="muted">'+esc(e.fazenda)+'</span>':''}</td><td>${esc(e.obra||'')}${e.obra?'<br>':''}<span class="muted">${esc(rotuloLote(e))}</span></td><td>${esc(itensResumo(e))}</td><td>${esc(e.consultor||'—')}</td><td>${bdgEtapa(pr.et)}${divAtiva(e)?' <span class="bdg div">Divergência</span>':''} ${bdgsExtra(e)}</td><td>${bdgPrazo(pr)}</td><td class="num">${pr.dias==null?'—':pr.dias}</td><td class="nw">${fmtD(pr.ref)}</td><td class="c">${(e.anexos||[]).length||''}</td><td>${ETAPA[pr.et].acao?`<button class="acao-btn so-editor" type="button" data-acao="${esc(e.id)}">${e.virtual?'Iniciar ET':esc(ETAPA[pr.et].acao)}</button>`:''}</td></tr>`;}).join('')||'<tr><td colspan="11" class="empty">Nenhuma entrega com esses filtros.</td></tr>'}</tbody></table></div></div>`;
   ligarCards($('quadro'));
 }
 
@@ -905,7 +929,7 @@ function renderClientes(){
   $('lista-clientes').innerHTML=G.map(g=>{
     const pasta=getRec('pastas',g.k);
     const meus=[...GR.values()].filter(x=>chave(x.cliente)===g.k);
-    const linhaE=e=>{const pr=prazo(e);return `<tr class="click" data-abrir="${esc(e.id)}"><td class="nw">${esc(e.numero||'—')}</td><td>${esc(rotuloLote(e)||'—')}</td><td>${esc(itensResumo(e))}</td><td>${esc(e.consultor||'—')}</td><td>${bdgEtapa(pr.et)}${divAtiva(e)?' <span class="bdg div">Divergência</span>':''}</td><td>${bdgPrazo(pr)}</td><td class="nw">${fmtD(e.termino)}</td><td class="nw">${e.aprovacao?fmtD(e.aprovacao):(e.aprovada?'<span class="muted">aprovada</span>':'—')}</td><td class="nw">${fmtD(e.pagamento)}</td><td class="c">${(e.anexos||[]).length||''}${e.pasta&&e.pasta.webUrl?` <a href="${esc(e.pasta.webUrl)}" target="_blank" rel="noopener" title="Pasta da entrega">📁</a>`:''}</td></tr>`;};
+    const linhaE=e=>{const pr=prazo(e);return `<tr class="click" data-abrir="${esc(e.id)}"><td class="nw">${esc(e.numero||'—')}</td><td>${esc(rotuloLote(e)||'—')}</td><td>${esc(itensResumo(e))}</td><td>${esc(e.consultor||'—')}</td><td>${bdgEtapa(pr.et)}${divAtiva(e)?' <span class="bdg div">Divergência</span>':''} ${bdgsExtra(e)}</td><td>${bdgPrazo(pr)}</td><td class="nw">${fmtD(e.termino)}</td><td class="nw">${e.aprovacao?fmtD(e.aprovacao):(e.aprovada?'<span class="muted">aprovada</span>':'—')}</td><td class="nw">${fmtD(e.pagamento)}</td><td class="c">${(e.anexos||[]).length||''}${e.pasta&&e.pasta.webUrl?` <a href="${esc(e.pasta.webUrl)}" target="_blank" rel="noopener" title="Pasta da entrega">📁</a>`:''}</td></tr>`;};
     const rows=meus.sort((a,b)=>(b.ativo-a.ativo)||a.nome.localeCompare(b.nome,'pt-BR')).map(x=>`<tr class="grp"><td colspan="10"><b>${esc(x.nome)}</b>${x.cods.length?' · Projeto '+esc(x.cods.join(', ')):''} · ${textoPivos(x)}${x.saldo>0&&x.totalOrigem!=='lotes'?` · <b style="color:var(--ferrugem)">saldo ${x.saldo} sem ET</b>`:''} <a href="#" class="so-editor" data-total="${esc(x.key)}">✎ total</a> <a href="#" class="so-editor" data-novo-lote="${esc(x.key)}">+ lote</a>${barraPivos(x)}</td></tr>`+(x.virtual?`<tr class="click" data-abrir="${esc(x.virtual.id)}"><td class="nw">—</td><td>—</td><td>${esc(x.virtual.itensTxt||'')}</td><td>—</td><td>${bdgEtapa('pendente')}</td><td>${bdgPrazo(prazo(x.virtual))}</td><td class="nw" colspan="4">obra concluída ${fmtD(x.virtual.dataConclusaoObra)}</td></tr>`:'')+x.lotes.map(linhaE).join('')).join('');
     return `<details class="cli-grupo" data-k="${esc(g.k)}"${CLI_ABERTO.has(g.k)?' open':''}><summary><b>${esc(g.nome)}</b><span class="muted">${meus.length} obra(s) · ${g.itens.filter(e=>!e.virtual).length} lote(s)${g.pv?' · '+g.pv+' pivô(s)':''}</span>${g.ab?`<span class="bdg etapa">${g.ab} em aberto</span>`:'<span class="bdg concluida">tudo pago</span>'}${g.atr?`<span class="bdg atrasada">${g.atr} atrasada(s)</span>`:''}${g.div?'<span class="bdg div">Divergência</span>':''}${pasta&&pasta.webUrl?`<a class="btn ghost tiny" href="${esc(pasta.webUrl)}" target="_blank" rel="noopener">📁 Pasta do cliente</a>`:''}</summary>
       <div class="tablewrap"><table class="dt" style="min-width:900px;"><thead><tr><th>Nº</th><th>Lote</th><th>Equipamentos</th><th>Consultor</th><th>Etapa</th><th>Prazo</th><th>Término</th><th>Aprovação fábrica</th><th>Pagamento</th><th class="c">📎</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
@@ -929,14 +953,14 @@ function renderTabela(){
   setSel('t-etapa',[...ETAPAS.map(e=>({v:e.id,l:e.nome})),{v:'div',l:'Com divergência'}],'Todas as etapas');
   setSel('t-consultor',listaConsultores(),'Todos os consultores');setSel('t-ano',anosLista(),'Todos os anos');
   montarGrupos();const L=linhasTabela();$('t-count').textContent=L.length+' entrega(s)';
-  $('tbl-entregas').innerHTML=`<thead><tr><th>Nº</th><th>Cliente / fazenda</th><th>Obra / lote</th><th>Etapa</th><th>Equipamentos</th><th>Consultor</th><th>Início</th><th>Término</th><th class="r">Duração</th><th>E-mail fábrica</th><th>Aprovação</th><th class="r">Dur. aprov.</th><th>Pagamento</th><th>Prazo</th><th class="c">📎</th></tr></thead><tbody>${L.map(e=>{const pr=prazo(e);const du=e.inicio&&e.termino?difDias(e.inicio,e.termino)+1:null;const da=e.emailFabrica&&e.aprovacao?difDias(e.emailFabrica,e.aprovacao):null;return `<tr class="click" data-abrir="${esc(e.id)}"><td class="nw">${esc(e.numero||'—')}</td><td><b>${esc(e.cliente)}</b>${e.fazenda?'<br><span class="muted">'+esc(e.fazenda)+'</span>':''}</td><td>${esc(e.obra||'')}${e.obra?'<br>':''}<span class="muted">${esc(rotuloLote(e))}</span></td><td>${bdgEtapa(pr.et)}${divAtiva(e)?' <span class="bdg div">Div.</span>':''}</td><td>${esc(itensResumo(e))}</td><td>${esc(e.consultor||'—')}</td><td class="nw">${fmtD(e.inicio)}</td><td class="nw">${fmtD(e.termino)}</td><td class="num">${du==null?'':du}</td><td class="nw">${fmtD(e.emailFabrica)}</td><td class="nw">${fmtD(e.aprovacao)}${e.aprovada&&!e.aprovacao?'<span class="muted">aprovada</span>':''}</td><td class="num">${da==null?'':da}</td><td class="nw">${fmtD(e.pagamento)}</td><td>${bdgPrazo(pr)}</td><td class="c">${(e.anexos||[]).length||''}</td></tr>`;}).join('')||'<tr><td colspan="15" class="empty">Nenhuma entrega.</td></tr>'}</tbody>`;
+  $('tbl-entregas').innerHTML=`<thead><tr><th>Nº</th><th>Cliente / fazenda</th><th>Obra / lote</th><th>Etapa</th><th>Equipamentos</th><th>Consultor</th><th>Início</th><th>Término</th><th class="r">Duração</th><th>E-mail fábrica</th><th>Aprovação</th><th class="r">Dur. aprov.</th><th>Pagamento</th><th>Prazo</th><th class="c">📎</th></tr></thead><tbody>${L.map(e=>{const pr=prazo(e);const du=e.inicio&&e.termino?difDias(e.inicio,e.termino)+1:null;const da=e.emailFabrica&&e.aprovacao?difDias(e.emailFabrica,e.aprovacao):null;return `<tr class="click" data-abrir="${esc(e.id)}"><td class="nw">${esc(e.numero||'—')}</td><td><b>${esc(e.cliente)}</b>${e.fazenda?'<br><span class="muted">'+esc(e.fazenda)+'</span>':''}</td><td>${esc(e.obra||'')}${e.obra?'<br>':''}<span class="muted">${esc(rotuloLote(e))}</span></td><td>${bdgEtapa(pr.et)}${divAtiva(e)?' <span class="bdg div">Div.</span>':''} ${bdgsExtra(e)}</td><td>${esc(itensResumo(e))}</td><td>${esc(e.consultor||'—')}</td><td class="nw">${fmtD(e.inicio)}</td><td class="nw">${fmtD(e.termino)}</td><td class="num">${du==null?'':du}</td><td class="nw">${fmtD(e.emailFabrica)}</td><td class="nw">${fmtD(e.aprovacao)}${e.aprovada&&!e.aprovacao?'<span class="muted">aprovada</span>':''}</td><td class="num">${da==null?'':da}</td><td class="nw">${fmtD(e.pagamento)}</td><td>${bdgPrazo(pr)}</td><td class="c">${(e.anexos||[]).length||''}</td></tr>`;}).join('')||'<tr><td colspan="15" class="empty">Nenhuma entrega.</td></tr>'}</tbody>`;
   ligarCards($('tbl-entregas'));
 }
 ['t-busca'].forEach(id=>$(id).addEventListener('input',renderTabela));['t-etapa','t-consultor','t-ano'].forEach(id=>$(id).addEventListener('change',renderTabela));
 $('t-excel').onclick=async()=>{
   try{await loadXlsx();}catch(e){toast('Não foi possível carregar o Excel.');return;}
   montarGrupos();const L=linhasTabela();
-  const rows=L.map(e=>{const pr=prazo(e);return {'Nº':e.numero||'','Cliente':e.cliente,'Fazenda':e.fazenda||'','Obra (montagem)':e.obra||'','Lote':rotuloLote(e),'Etapa':ETAPA[pr.et].nome,'Divergência':divAtiva(e)?(e.divergencia.motivo||'sim'):'','Equipamentos':itensResumo(e),'Pivôs':pivos(e)||'','Consultor':e.consultor||'','Início':fmtD(e.inicio),'Término':fmtD(e.termino),'Duração (dias)':e.inicio&&e.termino?difDias(e.inicio,e.termino)+1:'','E-mail fábrica':fmtD(e.emailFabrica),'Aprovação':fmtD(e.aprovacao),'Duração aprovação':e.emailFabrica&&e.aprovacao?difDias(e.emailFabrica,e.aprovacao):'','Pagamento':fmtD(e.pagamento),'Valor (R$)':nNum(e.valor)||'','NF / cobrança':e.nf||'','Prazo':PRAZO_INFO[pr.st]||'','Dias na etapa':pr.dias==null?'':pr.dias,'Anexos':(e.anexos||[]).length,'Pasta':e.pasta&&e.pasta.webUrl||''};});
+  const rows=L.map(e=>{const pr=prazo(e);return {'Nº':e.numero||'','Cliente':e.cliente,'Fazenda':e.fazenda||'','Obra (montagem)':e.obra||'','Lote':rotuloLote(e),'Etapa':ETAPA[pr.et].nome,'Divergência':divAtiva(e)?(e.divergencia.motivo||'sim'):'','Equipamentos':itensResumo(e),'Pivôs':pivos(e)||'','Consultor':e.consultor||'','Início':fmtD(e.inicio),'Término':fmtD(e.termino),'Duração (dias)':e.inicio&&e.termino?difDias(e.inicio,e.termino)+1:'','E-mail fábrica':fmtD(e.emailFabrica),'Aprovação':fmtD(e.aprovacao),'Duração aprovação':e.emailFabrica&&e.aprovacao?difDias(e.emailFabrica,e.aprovacao):'','Pagamento':fmtD(e.pagamento),'Valor (R$)':nNum(e.valor)||'','NF / cobrança':e.nf||'','Prazo':PRAZO_INFO[pr.st]||'','Tipo de conclusão':e.tipoConclusao==='parcial'?'Parcial':e.aguardandoRetorno?'Nada entregue':e.tipoConclusao==='total'?'Total':'','Retorno de':e.retornoDe?numeroDe(e.retornoDe):'','Retorno criado':e.retornoId?numeroDe(e.retornoId):'','Motivo impossibilidade':e.impossibilidade?e.impossibilidade.motivo:'','Previsão de retorno':fmtD(e.previsaoRetorno||(e.impossibilidade&&e.impossibilidade.previsao)),'Fábrica não pagou':e.semPagamento?fmtD(e.semPagamento.em):'','Dias na etapa':pr.dias==null?'':pr.dias,'Anexos':(e.anexos||[]).length,'Pasta':e.pasta&&e.pasta.webUrl||''};});
   const ws=XLSX.utils.json_to_sheet(rows);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Entregas');XLSX.writeFile(wb,'entrega_tecnica_'+hojeISO()+'.xlsx');
 };
 
@@ -999,6 +1023,8 @@ function renderPainel(){
   $('p-consultor-bars').innerHTML=hbars(cons.map(n=>{const L=base.filter(e=>(e.consultor||'(sem consultor)')===n);const ok=L.filter(e=>e.termino).length,ab2=L.length-ok;return {l:n,v:L.length,txt:ok+(ab2?' +'+ab2:''),partes:[{v:ok,c:'var(--azul-claro)'},{v:ab2,c:'var(--amarelo)'}]};}).sort((x,y)=>y.v-x.v))+`<p class="muted" style="margin-top:8px;">Verde = concluídas em campo · amarelo = ainda sem término.</p>`;
   /* itens */
   const porTipo={};doAno.forEach(e=>itensDe(e).forEach(i=>{const t=i.tipo||'Outro';porTipo[t]=(porTipo[t]||0)+(nNum(i.qtd)||1);}));
+  const mot={};todas.filter(e=>!e.virtual&&e.impossibilidade&&!e.retornoDe&&(!a||String(e.impossibilidade.data||'').slice(0,4)===a)).forEach(e=>{const k=e.impossibilidade.motivo||'—';mot[k]=(mot[k]||0)+1;});
+  $('p-motivos').innerHTML=hbars(Object.entries(mot).sort((x,y)=>y[1]-x[1]).map(([l,v])=>({l,v})),'var(--vermelho)')+`<p class="muted" style="margin-top:8px;">Entregas parciais ou sem entrega no período · ${todas.filter(e=>!e.virtual&&retornoAberto(e)).length} retorno(s) em aberto agora.</p>`;
   $('p-itens').innerHTML=hbars(Object.entries(porTipo).sort((x,y)=>y[1]-x[1]).map(([l,v])=>({l,v})),'var(--ferrugem)');
 }
 ['p-ano','p-consultor'].forEach(id=>$(id).addEventListener('change',renderPainel));
@@ -1017,7 +1043,8 @@ function renderParametros(){
   const cc=consultoresCentral();
   $('pr-consultores-lista').innerHTML=cc==null?'<div class="note warn" style="margin:0;">Não foi possível ler a Central de acessos (abra pelo MCPO 360). Enquanto isso, a lista usa os nomes das entregas.</div>':cc.length?`<table class="dt"><thead><tr><th>Consultor</th><th>E-mail</th><th>Nível</th></tr></thead><tbody>${cc.map(x=>`<tr><td><b>${esc(x.nome)}</b></td><td>${esc(x.email)}</td><td>${x.nivel==='admin'?'Admin':'Consultor'}</td></tr>`).join('')}</tbody></table>`:'<div class="note warn" style="margin:0;">Nenhum e-mail liberado como Admin ou Consultor da Entrega Técnica na Central de acessos.</div>';
   $('pr-tipos').value=(c.tipos||[]).join('\n');
-  $('pr-prazos').innerHTML=ETAPAS.filter(e=>e.id!=='paga').map(e=>`<div class="field"><label for="pr-pz-${e.id}">${esc(e.nome)}</label><input id="pr-pz-${e.id}" type="number" min="0" value="${esc(c.prazos[e.id])}"></div>`).join('');
+  $('pr-prazos').innerHTML=ETAPAS.filter(e=>e.id!=='paga').map(e=>`<div class="field"><label for="pr-pz-${e.id}">${esc(e.nome)}</label><input id="pr-pz-${e.id}" type="number" min="0" value="${esc(c.prazos[e.id])}"></div>`).join('')+`<div class="field"><label for="pr-pz-retorno">Retorno (dias após a previsão)</label><input id="pr-pz-retorno" type="number" min="0" value="${esc(c.prazos.retorno)}"></div>`;
+  $('pr-motivos').value=(c.motivosImpossibilidade||[]).join('\n');
   $('pr-atencao').value=c.atencaoPct;
   $('pr-email-para').value=c.emailPara||'';$('pr-email-cc').value=c.emailCc||'';$('pr-email-modelo').value=c.emailModelo||'';
   $('pr-corte').value=c.corteObras||'';
@@ -1029,7 +1056,8 @@ function renderParametros(){
 $('pr-salvar').onclick=()=>{
   if(!ehAdmin())return;
   const tipos=uniq($('pr-tipos').value.split('\n').map(normTxt));
-  const pz={};ETAPAS.filter(e=>e.id!=='paga').forEach(e=>pz[e.id]=Math.max(0,Math.round(n($('pr-pz-'+e.id).value))));
+  const pz={};ETAPAS.filter(e=>e.id!=='paga').forEach(e=>pz[e.id]=Math.max(0,Math.round(n($('pr-pz-'+e.id).value))));pz.retorno=Math.max(0,Math.round(n($('pr-pz-retorno').value)));
+  const mot=uniq($('pr-motivos').value.split('\n').map(normTxt));setConfig('motivosImpossibilidade',mot.length?mot:CONFIG_DEFAULT.motivosImpossibilidade);
   setConfig('tipos',tipos.length?tipos:CONFIG_DEFAULT.tipos);setConfig('prazos',pz);
   setConfig('atencaoPct',Math.min(100,Math.max(10,Math.round(n($('pr-atencao').value)||75))));
   setConfig('emailPara',normTxt($('pr-email-para').value));setConfig('emailCc',normTxt($('pr-email-cc').value));setConfig('emailModelo',$('pr-email-modelo').value);
@@ -1090,6 +1118,7 @@ function abrirEntrega(id,preset){
   const div=e.divergencia||{ativa:false,motivo:''};
   const corpo=`${lt||gAtual?`<p class="muted" style="margin:-4px 0 10px;">${lt?`<b>Lote ${lt.n} de ${lt.de}</b> · `:'Novo lote · '}${esc(gAtual?gAtual.nome:(e.obra||e.fazenda||e.cliente))}${gAtual?' · '+textoPivos(gAtual):''}</p>`:''}${passosHtml(e)}
   ${e.importado?'<div class="note">Entrega importada da planilha antiga — confira os equipamentos.</div>':''}
+  ${infoParcial(e)}
   <div class="lbl-sec">Cliente</div>
   <div class="grid3">${fld('m-cliente','Cliente <span class="req">*</span>',e.cliente,{list:'dl-cli',dis})}${fld('m-fazenda','Fazenda',e.fazenda,{dis})}${fld('m-consultor','Consultor',null,{type:'select',options:opts(opcoesConsultor(e.consultor),e.consultor,'— escolha —'),dis})}</div>
   <datalist id="dl-cli">${cliList.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
@@ -1122,6 +1151,7 @@ function abrirEntrega(id,preset){
     pode?{t:'Salvar',cls:'primary',fn:()=>salvarEntrega()}:null,
   ],()=>{EDIT=null;});
   renderItensEd();renderAnexosEd();renderObraSel();
+  document.querySelectorAll('#m-info-parcial [data-ir]').forEach(a=>a.onclick=ev=>{ev.preventDefault();fecharModal();abrirEntrega(a.dataset.ir);});
   if(pode){
     $('m-add-item').onclick=()=>{lerItensEd();EDIT.e.itens.push({tipo:(state.config.tipos||[])[0]||'Pivô completo',qtd:1,obs:''});renderItensEd();};
     $('m-div').onchange=ev=>ev.target.closest('.chk').classList.toggle('on',ev.target.checked);
@@ -1169,7 +1199,17 @@ function renderObraSel(){
     ${o?'':'<div class="muted" style="margin-top:6px;">Obra não encontrada na lista atual do módulo Obras.</div>'}</div>`;
   const lp=$('m-obra-limpar');if(lp)lp.onclick=()=>{EDIT.e.obraId='';EDIT.e.obra='';renderObraSel();};
 }
-function sugerirTipoAnexo(e){const et=etapa(e);if(et==='andamento'||et==='pendente')return 'termo';if(et==='envio'||et==='fabrica')return 'fabrica';if(et==='pagamento')return 'pagamento';return 'outro';}
+function infoParcial(e){
+  const im=e.impossibilidade;const L=[];
+  if(e.tipoConclusao==='parcial'){const r=e.retornoId&&getRec('entregas',e.retornoId);L.push(`<b>Entrega parcial</b> em ${fmtD(im&&im.data||e.termino)}. Pendente: <b>${r?esc(itensResumo(r)):'—'}</b>${r?` → retorno <a href="#" data-ir="${esc(e.retornoId)}">${esc(r.numero)}</a> (${esc(ETAPA[etapa(r)].nome)})`:''}.`);}
+  if(e.retornoDe){const o=getRec('entregas',e.retornoDe);L.push(`<b>Retorno</b> da entrega parcial ${o?`<a href="#" data-ir="${esc(e.retornoDe)}">${esc(o.numero)}</a>`:''}. Previsão: <b>${fmtD(e.previsaoRetorno)}</b>.${o&&o.semPagamento&&!o.pagamento?' A parcial não foi paga: será quitada com este retorno.':''}`);}
+  if(e.aguardandoRetorno&&!e.retornoDe)L.push(`<b>Nada foi entregue</b> na última ida (${(e.tentativas||[]).length} tentativa(s)). Previsão de retorno: <b>${fmtD(e.previsaoRetorno)}</b>.`);
+  if(im)L.push(`Motivo: <b>${esc(im.motivo)}</b>${im.obs?' — '+esc(im.obs):''}${im.assinante?' · assinado por '+esc(im.assinante):''}.`);
+  if(e.semPagamento&&!e.pagamento)L.push(`<b>Fábrica não pagou</b> esta parcial (${fmtD(e.semPagamento.em)}) — cobrada junto com o retorno.`);
+  if(faltaImp(e))L.push('<b style="color:var(--vermelho)">Falta anexar o termo de impossibilidade.</b>');
+  return L.length?`<div class="note warn" id="m-info-parcial">${L.join('<br>')}</div>`:'';
+}
+function sugerirTipoAnexo(e){if(faltaImp(e))return 'impossibilidade';const et=etapa(e);if(et==='andamento'||et==='pendente')return 'termo';if(et==='envio'||et==='fabrica')return 'fabrica';if(et==='pagamento')return 'pagamento';return 'outro';}
 function novaDeObra(v){
   const o=obraPorId(v.obraId)||{};const it=[];if(nNum(o.qtdPivos))it.push({tipo:'Pivô completo',qtd:nNum(o.qtdPivos),obs:''});if(o.qtdBombeamentos)it.push({tipo:'Bombeamento',qtd:o.qtdBombeamentos,obs:''});
   return {cliente:v.cliente,fazenda:'',obra:o.obra||v.obra||'',obraId:v.obraId,dataConclusaoObra:o.dataConclusao||'',itens:it.length?it:[{tipo:'Pivô completo',qtd:1,obs:''}],consultor:'',inicio:hojeISO(),termino:'',emailFabrica:'',aprovacao:'',pagamento:'',divergencia:{ativa:false,motivo:''},valor:'',nf:'',obs:'',anexos:[]};
@@ -1219,7 +1259,7 @@ function salvarEntrega(silencioso){
     if((antes.consultor||'')!==(e.consultor||''))addHist(e,'Consultor: '+(e.consultor||'—'));
   }
   e.anexos=EDIT.e.anexos||[];e.pasta=EDIT.e.pasta||e.pasta;
-  putRec('entregas',id,e);save();EDIT.id=id;EDIT.e=Object.assign({},e);
+  putRec('entregas',id,e);quitarParcialJunto(e);save();EDIT.id=id;EDIT.e=Object.assign({},e);
   if(!silencioso){fecharModal();renderAll();toast('Entrega salva.');}
   return id;
 }
@@ -1232,11 +1272,16 @@ function voltarEtapa(id){
   if(!podeEditar())return;const e=getRec('entregas',id);if(!e)return;const et=etapa(e);const c=CAMPO_ETAPA[et];if(!c)return;
   const ant=ETAPAS[ETAPA[et].i-1];
   modal('Voltar etapa',`<p style="margin:0 0 10px;"><b>${esc(e.numero||'')} · ${esc(rotuloCliente(e))}</b></p>
-    <p>A entrega volta de <b>${esc(ETAPA[et].nome)}</b> para <b>${esc(ant.nome)}</b>. A data “${esc(c[1])}” (${fmtD(e[c[0]])}) será apagada; os anexos continuam.</p>
+    <p>A entrega volta de <b>${esc(ETAPA[et].nome)}</b> para <b>${esc(ant.nome)}</b>. A data “${esc(c[1])}” (${fmtD(e[c[0]])}) será apagada; os anexos continuam.</p>${et==='envio'&&e.tipoConclusao==='parcial'?`<div class="note warn">Esta entrega foi parcial: os equipamentos voltam ao total previsto e o retorno ${esc(numeroDe(e.retornoId))} é excluído (se ainda não começou).</div>`:''}
     <div class="grid">${fld('v-motivo','Motivo (opcional)','',{full:true,ph:'ex.: lançado por engano, fábrica pediu correção'})}</div>`,[
     {t:'Cancelar',fn:()=>{fecharModal();abrirEntrega(id);}},
     {t:'← Voltar para '+ant.nome,cls:'primary',fn:()=>{
-      const x=clone(getRec('entregas',id));const antes=x[c[0]];x[c[0]]='';if(et==='pagamento')delete x.aprovada;
+      const x=clone(getRec('entregas',id));const antes=x[c[0]];x[c[0]]='';if(et==='pagamento'){delete x.aprovada;delete x.semPagamento;}
+      if(et==='envio'&&x.tipoConclusao==='parcial'){const r=x.retornoId&&getRec('entregas',x.retornoId);
+        if(r&&etapa(r)!=='pendente'){toast(`O retorno ${r.numero} já começou — volte ele primeiro.`,5000);return;}
+        if(r)delRec('entregas',x.retornoId);if(x.itensOriginais)x.itens=x.itensOriginais;
+        ['itensOriginais','retornoId','impossibilidade'].forEach(k=>delete x[k]);addHist(x,'Parcial desfeita'+(r?' (retorno '+r.numero+' excluído)':''));}
+      if(et==='envio')delete x.tipoConclusao;
       const mot=val('v-motivo');addHist(x,`Voltou etapa: ${ETAPA[et].nome} → ${ETAPA[etapa(x)].nome} (apagada ${c[1]} ${fmtD(antes)})${mot?' — '+mot:''}`);
       putRec('entregas',id,x);save();fecharModal();renderAll();toast(`${x.numero||'Entrega'}: voltou para ${ETAPA[etapa(x)].nome}`);abrirEntrega(id);}}]);
 }
@@ -1250,36 +1295,110 @@ function acaoEtapa(id){
   if(et==='pendente'){
     corpo=cab+`<div class="grid">${fld('a-consultor','Consultor',null,{type:'select',options:opts(opcoesConsultor(e.consultor),e.consultor,'— escolha —')})}${fld('a-data','Data de início',e.inicio||hoje,{type:'date'})}</div>`;
     aplicar=x=>{const c=$('a-consultor').value;if(!c)return 'Escolha o consultor.';x.consultor=c;x.consultorEmail=emailDoConsultor(c)||x.consultorEmail||'';x.inicio=$('a-data').value;if(!x.inicio)return 'Informe a data de início.';};
-  }else if(et==='andamento'){
+  }else if(et==='andamento'){concluirCampo(id);return;
+  }else if(et==='andamento_antigo'){
     const temTermo=(e.anexos||[]).some(a=>a.tipo==='termo');
     corpo=cab+`<div class="grid">${fld('a-data','Término em campo',hoje,{type:'date'})}</div>${temTermo?'<p class="muted">Termo de ET já anexado.</p>':'<div class="note warn">Anexe o termo de entrega técnica assinado.</div>'}<div style="margin-top:8px;"><label class="muted">Termo / fotos: <input type="file" id="a-arq" multiple></label></div>`;
     tipoAnx='termo';aplicar=x=>{x.termino=$('a-data').value;if(!x.termino)return 'Informe a data de término.';if(x.termino<x.inicio)return 'O término não pode ser antes do início.';};
   }else if(et==='envio'){
-    corpo=cab+`<p>Abra o e-mail já preenchido, envie para a fábrica e confirme a data abaixo.</p><button class="btn ghost small" type="button" id="a-mail">✉ Abrir e-mail para a fábrica</button>${state.config.emailPara?'':'<p class="muted">Cadastre o e-mail da fábrica em Parâmetros.</p>'}<div class="grid" style="margin-top:12px;">${fld('a-data','Data do envio',hoje,{type:'date'})}</div>`;
-    aplicar=x=>{x.emailFabrica=$('a-data').value;if(!x.emailFabrica)return 'Informe a data do envio.';};
+    const falta=faltaImp(e);
+    corpo=cab+(e.tipoConclusao==='parcial'?`<div class="note warn">Entrega PARCIAL: o e-mail já vai com a parte pendente e o motivo.${falta?' <b>Anexe o termo de impossibilidade</b> para poder enviar.':''}</div>${falta?'<div style="margin:6px 0 10px;"><label class="muted">Termo de impossibilidade: <input type="file" id="a-arq" multiple></label></div>':''}`:'')+`<p>Abra o e-mail já preenchido, envie para a fábrica e confirme a data abaixo.</p><button class="btn ghost small" type="button" id="a-mail">✉ Abrir e-mail para a fábrica</button>${state.config.emailPara?'':'<p class="muted">Cadastre o e-mail da fábrica em Parâmetros.</p>'}<div class="grid" style="margin-top:12px;">${fld('a-data','Data do envio',hoje,{type:'date'})}</div>`;
+    if(falta)tipoAnx='impossibilidade';
+    aplicar=x=>{if(falta&&!($('a-arq').files||[]).length)return 'Anexe o termo de impossibilidade antes de enviar à fábrica.';x.emailFabrica=$('a-data').value;if(!x.emailFabrica)return 'Informe a data do envio.';};
   }else if(et==='fabrica'){
     corpo=cab+`<div class="grid">${fld('a-data','Data da aprovação',hoje,{type:'date'})}${fld('a-valor','Valor a receber (R$)',e.valor,{ph:'0,00'})}</div><div style="margin-top:8px;"><label class="muted">Aprovação (e-mail/PDF): <input type="file" id="a-arq" multiple></label></div>`;
     tipoAnx='fabrica';aplicar=x=>{x.aprovacao=$('a-data').value;if(!x.aprovacao)return 'Informe a data da aprovação.';x.valor=val('a-valor')||x.valor;delete x.aprovada;};
   }else if(et==='pagamento'){
     corpo=cab+`<div class="grid">${fld('a-data','Data do pagamento',hoje,{type:'date'})}${fld('a-valor','Valor recebido (R$)',e.valor,{ph:'0,00'})}${fld('a-nf','NF / nº da cobrança',e.nf)}</div><div style="margin-top:8px;"><label class="muted">Comprovante: <input type="file" id="a-arq" multiple></label></div>`;
+    const orig=e.retornoDe&&getRec('entregas',e.retornoDe);
+    if(orig&&orig.semPagamento&&!orig.pagamento)corpo+=`<div class="note" style="margin-top:10px;">Este pagamento também quita a parcial <b>${esc(orig.numero||'')}</b> (${esc(itensResumo(orig))}), que a fábrica não pagou.</div>`;
+    if(e.semPagamento)corpo+=`<div class="note" style="margin-top:10px;">A fábrica não pagou esta parcial em ${fmtD(e.semPagamento.em)}; ela será quitada junto com o retorno. Use esta tela só se a fábrica pagar separado.</div>`;
     tipoAnx='pagamento';aplicar=x=>{x.pagamento=$('a-data').value;if(!x.pagamento)return 'Informe a data do pagamento.';x.valor=val('a-valor')||x.valor;x.nf=val('a-nf')||x.nf;};
   }else return;
   if(divAtiva(e))corpo+=`<label class="chk" style="display:inline-flex;margin-top:12px;"><input type="checkbox" id="a-resolver"> Divergência resolvida (${esc(e.divergencia.motivo||'')})</label>`;
-  modal(ETAPA[et].acao,corpo,[{t:'Cancelar',fn:fecharModal},{t:'Confirmar',cls:'primary',fn:async()=>{
+  modal(ETAPA[et].acao,corpo,[{t:'Cancelar',fn:fecharModal},et==='pagamento'&&e.tipoConclusao==='parcial'&&!e.semPagamento?{t:'Fábrica não pagou a parcial',fn:()=>naoPagou(id)}:null,{t:'Confirmar',cls:'primary',fn:async()=>{
     const x=clone(e);const erro=aplicar(x);if(erro){toast(erro);return;}
     if($('a-resolver')&&$('a-resolver').checked){x.divergencia={ativa:false,motivo:x.divergencia.motivo,desde:'',resolvidaEm:hojeISO()};addHist(x,'Divergência resolvida');}
     addHist(x,`${ETAPA[et].acao} (${fmtD($('a-data').value)}) → ${ETAPA[etapa(x)].nome}`);
     const arqs=$('a-arq')?Array.from($('a-arq').files||[]):[];
-    putRec('entregas',id,x);save();fecharModal();renderAll();toast(`${x.numero}: ${ETAPA[etapa(x)].nome}`);
+    putRec('entregas',id,x);quitarParcialJunto(x);save();fecharModal();renderAll();toast(`${x.numero}: ${ETAPA[etapa(x)].nome}`);
     if(arqs.length)await enviarArquivos(id,arqs,tipoAnx);
   }}]);
   const bm=$('a-mail');if(bm)bm.onclick=()=>abrirEmailFabrica(e);
 }
+function quitarParcialJunto(x){
+  if(!x.pagamento||!x.retornoDe)return;const o=getRec('entregas',x.retornoDe);
+  if(!o||!o.semPagamento||o.pagamento)return;const y=clone(o);y.pagamento=x.pagamento;addHist(y,`Paga junto com o retorno ${x.numero||''} (${fmtD(x.pagamento)})`);putRec('entregas',x.retornoDe,y);
+}
+function naoPagou(id){
+  const e=getRec('entregas',id);if(!e)return;
+  modal('Fábrica não pagou a parcial',`<p style="margin:0 0 10px;"><b>${esc(e.numero||'')} · ${esc(rotuloCliente(e))}</b><br><span class="muted">${esc(itensResumo(e))}</span></p>
+    <p>A parcial fica marcada como <b>“Cobra no retorno”</b> e é quitada automaticamente quando o retorno${e.retornoId?' <b>'+esc(numeroDe(e.retornoId))+'</b>':''} for pago.</p>
+    <div class="grid">${fld('np-data','Data da informação',hojeISO(),{type:'date'})}${fld('np-obs','Observação (opcional)','',{ph:'ex.: fábrica paga só a entrega completa'})}</div>`,[
+    {t:'Cancelar',fn:fecharModal},{t:'Confirmar',cls:'primary',fn:()=>{const x=clone(getRec('entregas',id));x.semPagamento={em:$('np-data').value||hojeISO(),obs:val('np-obs')};addHist(x,'Fábrica não pagou a parcial — cobrar junto com o retorno'+(x.retornoId?' '+numeroDe(x.retornoId):'')+(x.semPagamento.obs?' — '+x.semPagamento.obs:''));putRec('entregas',id,x);save();fecharModal();renderAll();toast(`${x.numero}: cobra no retorno`);}}]);
+}
+function concluirCampo(id){
+  const e=getRec('entregas',id);if(!e)return;const hoje=hojeISO();const itens=itensDe(e);
+  const motivos=(state.config.motivosImpossibilidade&&state.config.motivosImpossibilidade.length?state.config.motivosImpossibilidade:CONFIG_DEFAULT.motivosImpossibilidade);
+  const temTermo=(e.anexos||[]).some(a=>a.tipo==='termo'),temImp=(e.anexos||[]).some(a=>a.tipo==='impossibilidade');
+  const corpo=`<p style="margin:0 0 12px;"><b>${esc(e.numero||'')} · ${esc(rotuloCliente(e))}</b><br><span class="muted">${esc(itensResumo(e))}</span></p>
+  <div class="tipo-conc"><label class="chk on"><input type="radio" name="a-tipo" value="total" checked> Entrega total</label><label class="chk"><input type="radio" name="a-tipo" value="parcial"> Entrega parcial</label><label class="chk"><input type="radio" name="a-tipo" value="nada"> Nada entregue</label></div>
+  <div class="grid" style="margin-top:10px;">${fld('a-data','Data em campo',hoje,{type:'date'})}</div>
+  <div id="a-sec-parcial" style="display:none;"><div class="lbl-sec">O que foi entregue</div>
+    <table class="dt"><thead><tr><th>Equipamento</th><th class="r">Previsto</th><th class="r">Entregue</th><th class="r">Pendente</th></tr></thead><tbody>${itens.map((i,k)=>`<tr><td>${esc(itemTxt(Object.assign({},i,{qtd:''})).trim()||i.tipo)}</td><td class="num">${nNum(i.qtd)||1}</td><td class="num"><input type="number" min="0" max="${nNum(i.qtd)||1}" value="${nNum(i.qtd)||1}" data-ent="${k}" style="width:70px;border:1px solid var(--borda);border-radius:4px;padding:4px 6px;text-align:right;"></td><td class="num" data-pend="${k}">0</td></tr>`).join('')||'<tr><td colspan="4" class="empty">Cadastre os equipamentos da entrega antes.</td></tr>'}</tbody></table></div>
+  <div id="a-sec-imp" style="display:none;"><div class="lbl-sec">Termo de impossibilidade de entrega <span class="req">*</span></div>
+    <div class="grid">${fld('a-motivo','Motivo <span class="req">*</span>',null,{type:'select',options:opts(motivos,'','— escolha —')})}${fld('a-prev','Previsão de retorno <span class="req">*</span>','',{type:'date'})}${fld('a-assin','Assinado pelo cliente (nome)','')}${fld('a-impobs','Observação','')}</div>
+    <div style="margin-top:8px;"><label class="muted">Termo de impossibilidade preenchido em campo <span class="req">*</span>: <input type="file" id="a-arq-imp" multiple></label>${temImp?' <span class="muted">(já há um anexado)</span>':''}</div></div>
+  <div id="a-sec-termo" style="margin-top:10px;">${temTermo?'<p class="muted">Termo de ET já anexado.</p>':'<div class="note warn">Anexe o termo de entrega técnica assinado.</div>'}<label class="muted">Termo de ET / fotos: <input type="file" id="a-arq" multiple></label></div>
+  ${divAtiva(e)?`<label class="chk" style="display:inline-flex;margin-top:12px;"><input type="checkbox" id="a-resolver"> Divergência resolvida (${esc(e.divergencia.motivo||'')})</label>`:''}`;
+  modal('Concluir em campo',corpo,[{t:'Cancelar',fn:fecharModal},{t:'Confirmar',cls:'primary',fn:async()=>{
+    const tipo=(document.querySelector('input[name=a-tipo]:checked')||{}).value||'total';
+    const data=$('a-data').value;if(!data){toast('Informe a data em campo.');return;}
+    if(e.inicio&&data<e.inicio){toast('A data em campo não pode ser antes do início.');return;}
+    const termo=Array.from($('a-arq').files||[]),imp=Array.from($('a-arq-imp').files||[]);
+    const x=clone(e);let r=null,rid=null;
+    if($('a-resolver')&&$('a-resolver').checked){x.divergencia={ativa:false,motivo:x.divergencia.motivo,desde:'',resolvidaEm:hoje};addHist(x,'Divergência resolvida');}
+    if(tipo==='total'){
+      x.termino=data;x.tipoConclusao='total';addHist(x,`Concluída em campo — entrega total (${fmtD(data)}) → ${ETAPA[etapa(x)].nome}`);
+    }else{
+      const motivo=$('a-motivo').value,prev=$('a-prev').value;
+      if(!motivo){toast('Escolha o motivo da impossibilidade.');return;}
+      if(!prev){toast('Informe a previsão de retorno.');return;}
+      if(prev<data){toast('A previsão de retorno não pode ser antes da data em campo.');return;}
+      if(!imp.length&&!temImp){toast('Anexe o termo de impossibilidade preenchido em campo.');return;}
+      const im={motivo,previsao:prev,assinante:val('a-assin'),obs:val('a-impobs'),data};
+      if(tipo==='parcial'){
+        const ent=[],pend=[];itens.forEach((i,k)=>{const q=nNum(i.qtd)||1;const inp=document.querySelector(`[data-ent="${k}"]`);const v=Math.min(q,Math.max(0,Math.round(n(inp?inp.value:q))));if(v>0)ent.push(Object.assign({},i,{qtd:v}));if(q-v>0)pend.push(Object.assign({},i,{qtd:q-v}));});
+        if(!ent.length){toast('Nada foi entregue: escolha “Nada entregue”.');return;}
+        if(!pend.length){toast('Tudo foi entregue: escolha “Entrega total”.');return;}
+        x.itensOriginais=clone(itens);x.itens=ent;x.termino=data;x.tipoConclusao='parcial';x.impossibilidade=im;
+        rid=uid('et');r={cliente:x.cliente,fazenda:x.fazenda||'',obra:x.obra||'',obraId:x.obraId||'',grupoId:x.grupoId||'',dataConclusaoObra:x.dataConclusaoObra||'',codProjetos:x.codProjetos||[],consultor:x.consultor||'',consultorEmail:x.consultorEmail||'',itens:pend,retornoDe:id,previsaoRetorno:prev,impossibilidade:im,inicio:'',termino:'',emailFabrica:'',aprovacao:'',pagamento:'',divergencia:{ativa:false,motivo:''},valor:'',nf:'',obs:'',anexos:[],criadoEm:new Date().toISOString(),criadoPor:emailAtual()||'local',historico:[]};
+        r.numero=proximoNumero(prev.slice(0,4));x.retornoId=rid;
+        addHist(r,`Retorno criado a partir da entrega parcial ${x.numero||''}: ${itensResumo(r)} — ${motivo}; previsão ${fmtD(prev)}`);
+        addHist(x,`Entrega parcial em campo (${fmtD(data)}): entregue ${itensResumo(x)}; pendente ${itensResumo(r)} → retorno ${r.numero} — ${motivo}`);
+      }else{
+        x.tentativas=[...(x.tentativas||[]),{inicio:x.inicio,data,motivo,previsao:prev}];
+        x.aguardandoRetorno=true;x.previsaoRetorno=prev;x.impossibilidade=im;x.inicio='';x.termino='';
+        addHist(x,`Nada entregue em campo (${fmtD(data)}) — ${motivo}; previsão de retorno ${fmtD(prev)} → Pendente ET`);
+      }
+    }
+    putRec('entregas',id,x);if(r)putRec('entregas',rid,r);save();fecharModal();renderAll();
+    toast(tipo==='parcial'?`${x.numero}: parcial → ${ETAPA[etapa(x)].nome}; retorno ${r.numero} criado`:tipo==='nada'?`${x.numero}: aguardando retorno`:`${x.numero}: ${ETAPA[etapa(x)].nome}`,5000);
+    if(imp.length)await enviarArquivos(id,imp,'impossibilidade');
+    if(termo.length&&tipo!=='nada')await enviarArquivos(id,termo,'termo');
+  }}]);
+  const sync=()=>{const t=(document.querySelector('input[name=a-tipo]:checked')||{}).value;document.querySelectorAll('.tipo-conc .chk').forEach(l=>l.classList.toggle('on',l.querySelector('input').checked));$('a-sec-parcial').style.display=t==='parcial'?'':'none';$('a-sec-imp').style.display=t==='total'?'none':'';$('a-sec-termo').style.display=t==='nada'?'none':'';};
+  document.querySelectorAll('input[name=a-tipo]').forEach(i=>i.onchange=sync);
+  document.querySelectorAll('[data-ent]').forEach(inp=>inp.oninput=()=>{const k=inp.dataset.ent;const q=nNum(itens[k].qtd)||1;$('modal-b').querySelector(`[data-pend="${k}"]`).textContent=Math.max(0,q-Math.min(q,Math.max(0,Math.round(n(inp.value)))));});
+}
 function abrirEmailFabrica(e){
   const c=state.config;const tpl=c.emailModelo||CONFIG_DEFAULT.emailModelo;
   const corpo=tpl.replace(/\{(\w+)\}/g,(m,k)=>({cliente:e.cliente,fazenda:e.fazenda||'—',itens:itensResumo(e)||'—',consultor:e.consultor||'—',termino:fmtD(e.termino),numero:e.numero||'',pasta:e.pasta&&e.pasta.webUrl||'(anexos na pasta do cliente no SharePoint)'})[k]??m);
-  const assunto=`Entrega Técnica ${e.numero||''} — ${rotuloCliente(e)} — ${itensResumo(e)}`;
-  const q=['subject='+encodeURIComponent(assunto),'body='+encodeURIComponent(corpo)];if(c.emailCc)q.push('cc='+encodeURIComponent(c.emailCc));
+  let pre='',tag='';
+  if(e.tipoConclusao==='parcial'){const r=e.retornoId&&getRec('entregas',e.retornoId);const im=e.impossibilidade||{};tag='PARCIAL — ';pre=`ENTREGA PARCIAL\nEntregue: ${itensResumo(e)}\nPendente: ${r?itensResumo(r):'—'}\nMotivo: ${im.motivo||'—'}${im.obs?' ('+im.obs+')':''}\nPrevisão de retorno: ${fmtD(im.previsao)}\nTermo de impossibilidade de entrega anexo.\n\n`;}
+  if(e.retornoDe){const o=getRec('entregas',e.retornoDe);tag='COMPLEMENTO — ';pre=`COMPLEMENTO da entrega parcial ${o?o.numero:''}${o&&o.semPagamento&&!o.pagamento?` (a parcial ${o.numero} — ${itensResumo(o)} — ainda não foi paga e deve ser paga junto)`:''}\n\n`;}
+  const assunto=`${tag}Entrega Técnica ${e.numero||''} — ${rotuloCliente(e)} — ${itensResumo(e)}`;
+  const q=['subject='+encodeURIComponent(assunto),'body='+encodeURIComponent(pre+corpo)];if(c.emailCc)q.push('cc='+encodeURIComponent(c.emailCc));
   location.href='mailto:'+encodeURIComponent(c.emailPara||'').replace(/%2C/gi,',').replace(/%40/g,'@')+'?'+q.join('&');
 }
 
@@ -1335,7 +1454,7 @@ async function enviarArquivos(id,arqs,tipo){
     info('📁 preparando a pasta…');const pasta=await pastaDaEntrega(id);
     const novos=[];
     for(let i=0;i<arqs.length;i++){const a=arqs[i];info(`⬆ enviando ${i+1}/${arqs.length}…`);
-      const nome=nomePasta(({termo:'Termo ET',garantia:'Termo de garantia',fotos:'Foto',fabrica:'Fábrica',pagamento:'Comprovante'}[tipo]||'Anexo')+' - '+a.name.replace(/\.[^.]+$/,''))+(/\.[^.]+$/.exec(a.name)||[''])[0];
+      const nome=nomePasta(({termo:'Termo ET',garantia:'Termo de garantia',impossibilidade:'Termo de impossibilidade',fotos:'Foto',fabrica:'Fábrica',pagamento:'Comprovante'}[tipo]||'Anexo')+' - '+a.name.replace(/\.[^.]+$/,''))+(/\.[^.]+$/.exec(a.name)||[''])[0];
       const it=await subirArquivo(pasta,a,nome);if(it)novos.push({id:it.id,nome:it.name,tipo,webUrl:it.webUrl,tamanho:it.size||a.size,em:new Date().toISOString(),por:emailAtual()});}
     const x=clone(getRec('entregas',id));x.anexos=[...(x.anexos||[]),...novos];x.pasta=pasta;addHist(x,`${novos.length} anexo(s): ${TIPO_ANEXO[tipo]||tipo}`);putRec('entregas',id,x);save();
     if(EDIT&&EDIT.id===id){EDIT.e.anexos=x.anexos;EDIT.e.pasta=pasta;renderAnexosEd();}
