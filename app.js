@@ -344,6 +344,8 @@ function rota() {
   const r = (location.hash || '#inicio').slice(1) || 'inicio';
   $('menu').classList.remove('aberto');
   if (!conta) { mostrarTela('login'); renderMenu(); return; }
+  /* sessão Microsoft expirada: não é falta de acesso, é só confirmar o login */
+  if (_pedindo && !ACESSOS) { $('login-erro').textContent = 'Sua sessão expirou. Clique em Entrar para continuar.'; mostrarTela('login'); renderMenu(); return; }
   if (!meusModulos().length && !ehAdminCentral()) { $('sem-acesso-email').textContent = emailAtual(); $('sem-acesso-erro').textContent = ACESSOS_ERRO ? 'Detalhe: ' + ACESSOS_ERRO : ''; mostrarTela('sem-acesso'); renderMenu(); return; }
   if (MOD[r] && NIVEIS[r]) { renderMenu(r); mostrarTela('modulo'); abrirModulo(r); document.title = MOD[r].nome + ' · MCPO 360'; return; }
   if (r === 'central' && ehAdminCentral()) { renderMenu(r); renderCentral(); mostrarTela('central'); document.title = 'Central de acessos · MCPO 360'; return; }
@@ -669,6 +671,7 @@ async function iniciar() {
   // janela de login (popup) voltando para cá: só deixa a janela principal ler a resposta
   if (window.opener && window.opener !== window && /[#&?](code|error|state)=/.test(location.hash + location.search)) { document.body.innerHTML = '<p style="padding:24px;color:#5f6e62;font-family:system-ui">Concluindo o login…</p>'; return; }
   $('btn-entrar').onclick = entrar;
+  $('btn-reentrar').onclick = entrar;
   $('btn-sair').onclick = () => msal.logoutPopup({ account: conta, postLogoutRedirectUri: REDIRECT, mainWindowRedirectUri: BASE }).catch(() => { localStorage.clear(); location.reload(); });
   $('btn-menu').onclick = () => { if (window.matchMedia('(max-width:860px)').matches) $('menu').classList.toggle('aberto'); else alternarMenu(); };
   try { if (localStorage.getItem('mcpo360_menu') === 'fechado') document.body.classList.add('menu-fechado'); } catch (e) {}
