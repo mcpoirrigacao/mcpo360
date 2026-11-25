@@ -25,7 +25,7 @@ const GRAPH = 'https://graph.microsoft.com/v1.0';
 const BASE = typeof location !== 'undefined' ? location.origin + location.pathname.replace(/[^/]*$/, '') : '';
 const REDIRECT = BASE;   // https://mcpoirrigacao.github.io/mcpo360/ (cadastrado no Azure)
 const REG = '_mcpo_permissoes.json';
-const VERSAO = '202611250841';   // muda a cada publicação: força o navegador a buscar os módulos novos
+const VERSAO = '202611250854';   // muda a cada publicação: força o navegador a buscar os módulos novos
 
 /* ---------------- módulos ----------------
    niveis: do mais alto para o mais baixo.

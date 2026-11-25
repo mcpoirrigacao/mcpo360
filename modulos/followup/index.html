@@ -33,6 +33,13 @@ header.app-header .mod-switch{order:0;margin:3px 0!important;padding:2px!importa
 header.app-header .mod-switch button{padding:3px 9px!important;font-size:12px!important;line-height:1.3!important}
 </style>
 <style id="followup-linhas-extras">
+tr.resumo td{background:#fff;font-weight:600}
+tr.resumo td.num{font-variant-numeric:tabular-nums}
+tr.resumo.aberta td{background:#eef6ef;border-bottom-color:#cfe3d2}
+tr.resumo .tg{font:inherit;font-weight:700;background:none;border:0;padding:2px 4px 2px 0;cursor:pointer;color:inherit;text-align:left}
+tr.resumo .tg:hover{text-decoration:underline}
+tr.resumo .qtd{font-size:11px;font-weight:500;opacity:.65;margin-left:4px;white-space:nowrap}
+tr.resumo td.txt-resumo{font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 tr.sub td{background:#fbf9f4}
 tr.sub td.sub-nome{padding-left:22px;font-size:.92em;opacity:.85}
 tr.sub-add td{padding:2px 8px 8px!important}
@@ -505,6 +512,13 @@ function withDefaults(s){
         Object.entries(r.v||{}).forEach(([cid,v])=>{ d.v[cid]=(typeof v==='number'&&typeof d.v[cid]==='number')?d.v[cid]+v:(d.v[cid]??v); });
         delete s.registros[k]; _migRegs.push(k,nk); });
       eq.migr='trein2'; _migrados.push(eq.id);
+    }
+    if(eq.id==='pivo'&&eq.migrCli!=='n1'){ // Pivô: nome do cliente de cada lançamento, logo após CLIENTES VISITADOS
+      if(!eq.campos.some(c=>norm(c.nome)==='NOME CLIENTE')){
+        const nc=C('NOME CLIENTE','texto',{agreg:'soma'}); const i=eq.campos.findIndex(c=>norm(c.nome)==='CLIENTES VISITADOS');
+        if(i>=0) eq.campos.splice(i+1,0,nc); else eq.campos.push(nc);
+      }
+      eq.migrCli='n1'; _migrados.push(eq.id);
     }
     if(eq.id==='pivo'&&eq.migrSeg!=='s1'){ eq.campos.forEach(c=>{ if(['KM RODADO','CLIENTES VISITADOS'].includes(norm(c.nome))) c.segUnico=true; }); eq.migrSeg='s1'; _migrados.push(eq.id); }
     if(eq.id==='pivo'&&eq.migrGrp!=='g1'){
@@ -1106,6 +1120,44 @@ function download(nome,conteudo,tipo){const a=document.createElement('a');a.href
 
 /* ============================ LANÇAMENTOS ============================ */
 let lancEquipe=null;
+/* ---- Lançamentos (equipes manuais): linha da pessoa mostra os totais; os lançamentos ficam numa lista que abre/fecha ---- */
+const ABERTOS=new Set(), FECHADOS=new Set();
+function chaveAberta(eq,l,g){return eq.id+'|'+l.id+'|'+g;}
+function estaAberta(eq,l,g){const k=chaveAberta(eq,l,g); if(ABERTOS.has(k)) return true; if(FECHADOS.has(k)) return false; return !isAdmin()&&minhaLinha(eq,l);}
+function textoResumo(eq,s,l,g,c){ const r=rec(s,eq.id,l.id,g); if(!r||!r.v) return '';
+  const xs=Object.keys(r.v).filter(k=>k===c.id||k.indexOf(c.id+'#')===0).sort((a,b)=>(+(a.split('#')[1]||1))-(+(b.split('#')[1]||1))).map(k=>r.v[k]).filter(temValor).map(String);
+  if(!xs.length) return ''; const u=Array.from(new Set(xs)); return u.slice(0,2).join(', ')+(u.length>2?` +${u.length-2}`:''); }
+function celulaResumo(eq,s,g,l,c){
+  if(bloqueadoNoSeg(eq,c,g)) return `<td class="bloq" title="Lançado só em ${escapeHtml(eq.segmentos[0])}">—</td>`;
+  const da=`data-rs-l="${l.id}" data-rs-g="${escapeHtml(g)}" data-rs-c="${c.id}"`;
+  if(isNum(c)) return `<td class="num ${c.auto?'auto':''}" ${da}>${fmt(c,valor(s,eq,l.id,g,c))}</td>`;
+  return `<td class="txt-resumo" ${da} title="${escapeHtml(textoResumo(eq,s,l,g,c))}">${escapeHtml(textoResumo(eq,s,l,g,c))}</td>`;
+}
+function qtdLanc(r,n,cols){ return Array.from({length:n},(_,i)=>i).filter(i=>cols.some(c=>{const v=r&&r.v?r.v[i?c.id+'#'+(i+1):c.id]:undefined;return temValor(v);})).length; }
+function linhaResumoHtml(eq,s,g,l,cols,soLeitura,outro){
+  const k=rkey(s,eq.id,l.id,g), r=state.registros[k], n=nSub(k)+1, aberta=estaAberta(eq,l,g), podeSub=!soLeitura;
+  const tags=`${minhaLinha(eq,l)?' <span class="pill ok">você</span>':''}${porEmail(eq)&&!linhaEditavel(eq,l)&&!outro?` <span class="pill pend">${l.email?'inativo':'histórico'}</span>`:''}`;
+  const qtd=qtdLanc(r,n,cols);
+  let x=`<tr class="resumo${minhaLinha(eq,l)?' minha':''}${aberta?' aberta':''}"><td class="nome"><button type="button" class="tg" data-tg="${escapeHtml(chaveAberta(eq,l,g))}" aria-expanded="${aberta}" title="${aberta?'Fechar':'Abrir'} os lançamentos">${aberta?'▾':'▸'} ${escapeHtml(l.nome)}</button>${tags} <span class="qtd" data-qtd="${escapeHtml(k)}">${qtd} lanç.</span></td>${eq.usaRegional?`<td>${l.regional?`<span class="reg ${escapeHtml(l.regional)}">${escapeHtml(l.regional)}</span>`:''}</td>`:''}`;
+  cols.forEach(c=>{ x+=celulaResumo(eq,s,g,l,c); });
+  x+=`</tr>`;
+  if(!aberta) return x;
+  for(let idx=1;idx<=n;idx++){
+    x+=`<tr class="sub"><td class="nome sub-nome">Lançamento ${idx}${podeSub&&idx>1?` <button class="btn icon danger" type="button" data-rmsub="${idx}" data-l="${l.id}" data-g="${escapeHtml(g)}" title="Apagar este lançamento">×</button>`:''}</td>${eq.usaRegional?'<td></td>':''}`;
+    cols.forEach(c=>{
+      if(bloqueadoNoSeg(eq,c,g)||c.auto){ x+=`<td class="bloq">—</td>`; return; }
+      const cid=idx>1?c.id+'#'+idx:c.id; const vv=r&&r.v?r.v[cid]:undefined; const val=temValor(vv)?vv:'';
+      const da=`data-l="${l.id}" data-g="${escapeHtml(g)}" data-c="${c.id}"${idx>1?` data-i="${idx}"`:''}`;
+      if(!podeSub){ x+=`<td class="${isNum(c)?'num':''}">${isNum(c)?fmt(c,vv):escapeHtml(val)}</td>`; return; }
+      if(c.tipo==='lista') x+=`<td><select ${da}><option value=""></option>${c.opcoes.map(o=>`<option ${String(val)===o?'selected':''}>${escapeHtml(o)}</option>`).join('')}</select></td>`;
+      else if(c.tipo==='texto') x+=`<td><input type="text" ${da} value="${escapeHtml(val)}"${norm(c.nome)==='NOME CLIENTE'?' placeholder="cliente"':''}></td>`;
+      else x+=`<td><input type="text" class="num-in" inputmode="decimal" autocomplete="off" ${da} value="${escapeHtml(numParaTexto(c,val))}"${c.tipo==='percentual'?' placeholder="%" title="Digite em %, ex.: 12,5"':c.tipo==='moeda'?' placeholder="R$"':''}></td>`;
+    });
+    x+=`</tr>`;
+  }
+  if(podeSub) x+=`<tr class="sub-add"><td colspan="${cols.length+1+(eq.usaRegional?1:0)}"><button class="btn ghost small" type="button" data-addsub data-l="${l.id}" data-g="${escapeHtml(g)}">+ lançamento para ${escapeHtml(l.nome)}</button></td></tr>`;
+  return x;
+}
 function renderLanc(){
   const vis=equipesVisiveis();
   if(!lancEquipe||!vis.find(e=>e.id===lancEquipe)) lancEquipe=(vis.find(podeEditar)||vis[0]||{}).id||null;
@@ -1129,6 +1181,7 @@ function renderLanc(){
     ls.forEach(l=>{
       const soLeitura=!pode||!linhaEditavel(eq,l);
       const outro=porEmail(eq)&&!isAdmin()&&l.email&&l.ativo!==false&&!minhaLinha(eq,l);
+      if(eq.tipo==='manual'){ html+=linhaResumoHtml(eq,s,g,l,cols,soLeitura,outro); return; }
       html+=`<tr${minhaLinha(eq,l)?' class="minha"':''}><td class="nome">${escapeHtml(l.nome)}${minhaLinha(eq,l)?' <span class="pill ok">você</span>':''}${porEmail(eq)&&!linhaEditavel(eq,l)&&!outro?` <span class="pill pend" title="${l.email?'E-mail removido de Quem preenche — linha inativa':'Linha antiga sem e-mail — ligue a um e-mail em Equipes &amp; Campos para editar'}">${l.email?'inativo':'histórico'}</span>`:''}</td>${eq.usaRegional?`<td>${l.regional?`<span class="reg ${escapeHtml(l.regional)}">${escapeHtml(l.regional)}</span>`:''}</td>`:''}`;
       const kSub=rkey(s,eq.id,l.id,g), rSub=state.registros[kSub], nS=eq.tipo==='manual'?nSub(kSub):0;
       const podeSub=eq.tipo==='manual'&&!soLeitura;
@@ -1177,6 +1230,8 @@ function renderLanc(){
   }
   if(eq.tipo==='assistencia') html+=resumoAssistHtml(s);
   body.innerHTML=html;
+  body.querySelectorAll('[data-tg]').forEach(b=>b.onclick=()=>{ const k=b.dataset.tg, ab=b.getAttribute('aria-expanded')==='true';
+    if(ab){ ABERTOS.delete(k); FECHADOS.add(k); } else { FECHADOS.delete(k); ABERTOS.add(k); } renderLanc(); });
   if(!pode) return;
   body.querySelectorAll('input[data-c],select[data-c]').forEach(inp=>{
     const handler=()=>{
@@ -1194,7 +1249,7 @@ function renderLanc(){
     if(inp.tagName==='INPUT') inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); handler(); moverFoco(inp,e.shiftKey?-1:1); } });
   });
   body.querySelectorAll('[data-addsub]').forEach(b=>b.onclick=()=>{
-    const k=rkey(s,eq.id,b.dataset.l,b.dataset.g); const novo=nSub(k)+2; SUBLOCAL[k]=novo; renderLanc();
+    const k=rkey(s,eq.id,b.dataset.l,b.dataset.g); const novo=nSub(k)+2; SUBLOCAL[k]=novo; ABERTOS.add(eq.id+'|'+b.dataset.l+'|'+b.dataset.g); renderLanc();
     const el=Array.from(document.querySelectorAll('#lanc-body [data-i="'+novo+'"]')).find(x=>x.dataset.l===b.dataset.l&&x.dataset.g===b.dataset.g); if(el) el.focus();
   });
   body.querySelectorAll('[data-rmsub]').forEach(b=>b.onclick=()=>{
@@ -1232,6 +1287,9 @@ function moverFoco(inp,dir){ // Enter desce para a mesma coluna na próxima linh
 }
 function atualizarTotaisLanc(eq){
   const s=semanaRef;
+  document.querySelectorAll('#lanc-body [data-rs-c]').forEach(td=>{ const c=eq.campos.find(x=>x.id===td.dataset.rsC); const l={id:td.dataset.rsL}; if(!c) return;
+    if(isNum(c)) td.textContent=stripHtml(fmt(c,valor(s,eq,l.id,td.dataset.rsG,c))); else { const t=textoResumo(eq,s,l,td.dataset.rsG,c); td.textContent=t; td.title=t; } });
+  document.querySelectorAll('#lanc-body [data-qtd]').forEach(sp=>{ const k=sp.dataset.qtd; sp.textContent=qtdLanc(state.registros[k],nSub(k)+1,camposAtivos(eq))+' lanç.'; });
   document.querySelectorAll('#lanc-body tr[data-total]').forEach(tr=>{ const g=tr.dataset.total; tr.querySelectorAll('[data-tc]').forEach(td=>{const c=eq.campos.find(x=>x.id===td.dataset.tc); if(c&&isNum(c)) td.textContent=stripHtml(fmt(c,totalSemana(eq,s,c,{seg:g})));}); });
   const tg=document.getElementById('lanc-total-geral'); if(tg) tg.querySelectorAll('[data-tc]').forEach(td=>{const c=eq.campos.find(x=>x.id===td.dataset.tc); if(c) td.textContent=stripHtml(fmt(c,totalSemana(eq,s,c)));});
   const st=statusPreench(eq,s); const pm=document.querySelector('#lanc-meta .pill'); if(pm) pm.outerHTML=pillStatus(st); const chip=document.querySelector(`#lanc-equipes .chip[data-eq="${eq.id}"] .dot`); if(chip) chip.className='dot '+st.tipo;
