@@ -327,11 +327,11 @@ function loadMsal(){
       <div class="grid">
         <div class="field"><label>Empresa</label><input type="text" id="i-empresa"></div>
         <div class="field"><label>Cliente</label><input type="text" id="i-cliente"></div>
-        <div class="field"><label>Obra / Projeto</label><input type="text" id="i-obra"></div>
+        <div class="field"><label>Fazenda / Etapa</label><input type="text" id="i-obra" placeholder="ex: Fazenda Santa Rita - Etapa 2"></div>
         <div class="field"><label>Endereço da Obra</label><input type="text" id="i-endereco"></div>
-        <div class="field"><label>Vendedor</label><input type="text" id="i-vendedor"></div>
+        <div class="field"><label>Vendedor</label><input type="text" id="i-vendedor" title="Preenchido pelo login (nome antes do @)"></div>
         <div class="field"><label>Responsável Técnico</label><input type="text" id="i-responsavel"></div>
-        <div class="field"><label>Área / Hectares</label><input type="text" id="i-hectares" placeholder='ex: 16 pivôs - 480 ha'></div>
+        <div class="field"><label>Área (hectares)</label><input type="number" id="i-hectares" min="0" step="any" inputmode="decimal" placeholder="ex: 480"></div>
         <div class="field"><label>Número de Pivôs</label><input type="number" id="i-numpivos" min="0"></div>
       </div>
     </div>
@@ -1263,13 +1263,35 @@ function bindSimpleInputs(){
   }
 }
 
+/* Área: só o número de hectares (orçamentos antigos tinham texto, ex. "16 pivôs - 480 ha") */
+function haNumero(v){
+  if(v===null||v===undefined||v==='') return '';
+  if(typeof v==='number') return v;
+  const s=String(v).replace(/\./g,'').replace(',', '.');
+  const m=s.match(/([\d.]+)\s*ha/i) || s.match(/([\d.]+)(?!.*\d)/);
+  return m ? Number(m[1]) : '';
+}
+function haTexto(v){ const n=haNumero(v); return n===''?'':(n.toLocaleString('pt-BR')+' ha'); }
+/* Vendedor: vem do login (parte do e-mail antes do @) */
+function vendedorDoLogin(){ const e=(typeof emailUsuarioAtual==='function')?emailUsuarioAtual():''; return e?e.split('@')[0]:''; }
+function preencherVendedorAuto(){
+  const el=document.getElementById('i-vendedor'); if(!el||!state||!state.info) return;
+  const v=vendedorDoLogin();
+  if(v && !String(state.info.vendedor||'').trim()){ state.info.vendedor=v; el.value=v; }
+  const nivel=(typeof nivelAcesso==='function')?nivelAcesso():'';
+  el.readOnly = !(nivel==='admin' || nivel==='gestor');   // comum: fica com o próprio login
+  el.style.background = el.readOnly ? '#f3efe7' : '';
+}
+
 function fillSimpleInputsFromState(){
+  if(state && state.info) state.info.hectares = haNumero(state.info.hectares);
   SIMPLE_BINDINGS.forEach(([id,group,key])=>{
     const el=document.getElementById(id);
     if(!el) return;
     const v = (group==='_root') ? state[key] : state[group][key];
     el.value = (v===null || v===undefined) ? '' : v;
   });
+  preencherVendedorAuto();
 }
 
 /* ============================================================
@@ -3065,11 +3087,11 @@ async function exportarExcel(st, r){
     ['Campo','Valor'],
     ['Empresa', st.info.empresa],
     ['Cliente', st.info.cliente],
-    ['Obra / Projeto', st.info.obra],
+    ['Fazenda / Etapa', st.info.obra],
     ['Endereço', st.info.endereco],
     ['Vendedor', st.info.vendedor],
     ['Responsável Técnico', st.info.responsavel],
-    ['Área / Hectares', st.info.hectares],
+    ['Área (hectares)', haTexto(st.info.hectares)],
     ['Número de Pivôs', st.info.numPivos],
   ];
   const ws1 = XLSX.utils.aoa_to_sheet(dadosObra);
@@ -3164,11 +3186,11 @@ async function exportarExcel(st, r){
     [],
     ['IDENTIFICAÇÃO',''],
     ['Cliente', st.info.cliente],
-    ['Obra / Projeto', st.info.obra],
+    ['Fazenda / Etapa', st.info.obra],
     ['Endereço', st.info.endereco],
     ['Vendedor', st.info.vendedor],
     ['Responsável Técnico', st.info.responsavel],
-    ['Área / Hectares', st.info.hectares],
+    ['Área (hectares)', haTexto(st.info.hectares)],
     [],
     ['RESUMO TÉCNICO',''],
     ['TMO de Obra (h)', r.tmoTotal],
@@ -3269,7 +3291,7 @@ async function exportarHistoricoExcel(){
     const s = item.data;
     const nome = ('Obra '+(idx+1)+' '+( s.info.cliente||'').slice(0,18)).slice(0,31);
     const detRows = [
-      ['Cliente', s.info.cliente],['Obra', s.info.obra],['Vendedor', s.info.vendedor],
+      ['Cliente', s.info.cliente],['Fazenda / Etapa', s.info.obra],['Vendedor', s.info.vendedor],
       ['Data Salvo', new Date(item.savedAt).toLocaleString('pt-BR')],
       [],
       ['Pivôs', s.info.numPivos],['TMO (h)', r.tmoTotal],['Prazo (dias)', r.prazoEstimado],
@@ -3561,6 +3583,7 @@ function somenteVisualizacao(item){
 
 function aplicarControleAcesso(){
   const nivel = nivelAcesso();
+  try{ preencherVendedorAuto(); }catch(e){}
   const overlayLogin = document.getElementById('overlay-login');
   const overlayNegado = document.getElementById('overlay-acesso-negado');
 
