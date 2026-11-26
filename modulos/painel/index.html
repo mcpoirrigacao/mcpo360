@@ -1187,7 +1187,7 @@ const EMBED_CSS_COMUM = `#btn-ms-login,#ms-user-info,#sync-status,#btn-sync,#ove
 nav.tabs button[data-tab="parametros"],#pane-parametros{display:none!important}
 html,body{background:transparent}`;
 /* apps no padrão MAQCAMPO: some o cabeçalho verde (marca + abas); o conteúdo sobe */
-const CSS_SEM_CABECALHO = `header.app-header{display:none!important} main{padding-top:14px!important}`;
+const CSS_SEM_CABECALHO = `html body header.app-header{display:none!important} main{padding-top:14px!important}`;   /* seletor mais forte: os módulos do MCPO 360 forçam display:flex no cabeçalho */
 const MENU_ABAS = { sel:'nav.tabs button[data-tab]', chave:'data-tab' };
 const CONTROLES_CABECALHO = 'header.app-header input[id]:not([type=hidden]):not([type=file]), header.app-header select[id]';
 
