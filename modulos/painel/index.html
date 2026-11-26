@@ -279,6 +279,7 @@ body.modo-tv .embed-wrap iframe{height:calc(100vh - 190px);}
     <button data-tab="compras" data-area="cmp">Compras-estoque<span class="dot" data-dot="cmp"></span></button>
     <button data-tab="assistencia" data-area="ast">Assistência Técnica<span class="dot" data-dot="ast"></span></button>
     <button data-tab="obras" data-area="obr">Obras<span class="dot" data-dot="obr"></span></button>
+    <button data-tab="entregas" data-area="ent">Entrega Técnica<span class="dot" data-dot="ent"></span></button>
     <button data-tab="orcamentos" data-area="orc">Orçamentos Montagem<span class="dot" data-dot="orc"></span></button>
     <button data-tab="fontes" class="somente-admin">⚙ Fontes e Parâmetros</button>
   </nav>
@@ -300,6 +301,7 @@ body.modo-tv .embed-wrap iframe{height:calc(100vh - 190px);}
   <section class="pane" id="pane-compras"><div class="subnav" id="sub-cmp"><div class="sub-itens"></div><div class="sub-dir"><div class="sub-ctl"></div><span class="fonte-chip" data-chip="cmp"></span></div></div><div id="cmp-aviso" class="sub-aviso"></div><div class="embed-wrap" id="embed-cmp"></div></section>
   <section class="pane" id="pane-assistencia"><div class="subnav" id="sub-ast"><div class="sub-itens"></div><div class="sub-dir"><div class="sub-ctl"></div><span class="fonte-chip" data-chip="ast"></span></div></div><div id="ast-aviso" class="sub-aviso"></div><div class="embed-wrap" id="embed-ast"></div></section>
   <section class="pane" id="pane-obras"><div class="subnav" id="sub-obr"><div class="sub-itens"></div><div class="sub-dir"><div class="sub-ctl"></div><span class="fonte-chip" data-chip="obr"></span></div></div><div id="obr-aviso" class="sub-aviso"></div><div class="embed-wrap" id="embed-obr"></div></section>
+  <section class="pane" id="pane-entregas"><div class="subnav" id="sub-ent"><div class="sub-itens"></div><div class="sub-dir"><div class="sub-ctl"></div><span class="fonte-chip" data-chip="ent"></span></div></div><div id="ent-aviso" class="sub-aviso"></div><div class="embed-wrap" id="embed-ent"></div></section>
   <section class="pane" id="pane-crmsam"><div class="subnav" id="sub-sam"><div class="sub-itens"></div><div class="sub-dir"><div class="sub-ctl"></div><span class="fonte-chip" data-chip="sam"></span></div></div><div id="sam-aviso" class="sub-aviso"></div><div class="embed-wrap" id="embed-sam"></div></section>
 
   <!-- ============================ ORÇAMENTOS ============================ -->
@@ -405,6 +407,7 @@ const CAMINHOS = {
   ast: { pasta:'assistencia', dados:'assistencia_dados.json', acesso:'assistencia_acesso.json', app:'https://mcpoirrigacao.github.io/mcpo360/modulos/assistencia/' },
   obr: { pasta:'Execução de Montagem', clientes:'mcpo_clientes.json', obras:'mcpo_obras.json', lancamentos:'mcpo_lancamentos.json', tecnicos:'mcpo_tecnicos.json',
          alocacoes:'mcpo_alocacoes.json', listas:'mcpo_listas.json', acesso:'mcpo_acesso.json', app:'https://mcpoirrigacao.github.io/mcpo360/modulos/obras/' },
+  ent: { pasta:'Entrega Técnica', dados:'_dados/entregas_dados.json', obras:'_dados/obras_concluidas.json', app:'https://mcpoirrigacao.github.io/mcpo360/modulos/entregas/' },
   orc: { pasta:'Orçamentos Montagem/Historico_montagem', params:'parametros.json', app:'https://mcpoirrigacao.github.io/mcpo360/modulos/orcamento/' },
   sam: { link:'https://maqcampoirrigacao.sharepoint.com/:f:/s/MCPOIRRIGACAO/IgBGAtqGFxaXRrJhUQ8lzqOJAd3QQQZ_zeb-i3Ox7QMpddU?e=Q8SRTl',
          pasta:'CRM SAM', dados:'crm_sam_dados.json', app:'https://mcpoirrigacao.github.io/mcpo360/modulos/crmsam/' },
@@ -719,7 +722,7 @@ async function alterarPainel(arquivo, alterar){
 }
 
 /* ------------------------------ estado do painel ------------------------------ */
-const PARAMS_PADRAO={ areas:{crm:true,sam:true,fat:true,cmp:true,ast:true,obr:true,orc:true}, autoMin:10, tvSeg:45, crmSenha:'', grupos:{edicao:'',leitura:''} };
+const PARAMS_PADRAO={ areas:{crm:true,sam:true,fat:true,cmp:true,ast:true,obr:true,ent:true,orc:true}, autoMin:10, tvSeg:45, crmSenha:'', grupos:{edicao:'',leitura:''} };
 const PAINEL={ acesso:{emailsAutorizados:[],emailsComuns:[]}, params:JSON.parse(JSON.stringify(PARAMS_PADRAO)), nivel:'', motivo:'', pastaOk:false, erroPasta:'' };
 function normAcesso(d){
   d=d||{}; const low=a=>(a||[]).map(x=>String(x).toLowerCase().trim()).filter(Boolean);
@@ -741,11 +744,12 @@ const FONTES={
   fat:{ nome:'Gestão Balcão - Peças', onde:'SharePoint › Pecas Varejo', estado:'idle', msg:'', quando:null, dados:null },
   ast:{ nome:'Assistência Técnica', onde:'SharePoint › assistencia', estado:'idle', msg:'', quando:null, dados:null },
   obr:{ nome:'Obras de Montagem', onde:'SharePoint › Execução de Montagem', estado:'idle', msg:'', quando:null, dados:null },
+  ent:{ nome:'Entrega Técnica', onde:'SharePoint › Entrega Técnica › _dados', estado:'idle', msg:'', quando:null, dados:null },
   cmp:{ nome:'Compras-estoque', onde:'SharePoint › Compras-estoque', estado:'idle', msg:'', quando:null, dados:null },
   orc:{ nome:'Orçamentos Montagem', onde:'SharePoint › Orçamentos Montagem/Historico_montagem', estado:'idle', msg:'', quando:null, dados:null },
 };
 const CARREGADORES={}, RENDER={}, RESUMO={};
-const ABA_FONTE={ compras:'cmp', comercial:'crm', crmsam:'sam', faturamento:'fat', assistencia:'ast', obras:'obr', orcamentos:'orc' };
+const ABA_FONTE={ compras:'cmp', comercial:'crm', crmsam:'sam', faturamento:'fat', assistencia:'ast', obras:'obr', entregas:'ent', orcamentos:'orc' };
 function areaVisivel(k){ return PAINEL.nivel==='admin' || PAINEL.params.areas[k]!==false; }
 
 function marcarFonte(k, estado, msg){
@@ -814,7 +818,7 @@ async function renderAba(tab){
 function renderGeral(){
   const [y,m]=FILTRO.ym.split('-');
   document.getElementById('geral-desc').textContent=`Resumo de ${MESES_LONGO[+m-1]}/${y}. Clique num bloco para abrir a tela completa da área.`;
-  const ordem=[['crm','comercial'],['sam','crmsam'],['fat','faturamento'],['cmp','compras'],['ast','assistencia'],['obr','obras'],['orc','orcamentos']].filter(([k])=>areaVisivel(k));
+  const ordem=[['crm','comercial'],['sam','crmsam'],['fat','faturamento'],['cmp','compras'],['ast','assistencia'],['obr','obras'],['ent','entregas'],['orc','orcamentos']].filter(([k])=>areaVisivel(k));
   document.getElementById('geral-areas').innerHTML=ordem.map(([k,tab])=>{
     const f=FONTES[k];
     let corpo;
@@ -839,7 +843,7 @@ function renderFontes(){
 }
 
 /* ------------------------------ admin: usuários e parâmetros ------------------------------ */
-const NOMES_AREA={crm:'Comercial',sam:'CRM SAM',fat:'Gestão Balcão - Peças',cmp:'Compras-estoque',ast:'Assistência Técnica',obr:'Obras',orc:'Orçamentos Montagem'};
+const NOMES_AREA={crm:'Comercial',sam:'CRM SAM',fat:'Gestão Balcão - Peças',cmp:'Compras-estoque',ast:'Assistência Técnica',obr:'Obras',ent:'Entrega Técnica',orc:'Orçamentos Montagem'};
 function renderAdmin(){
   if(PAINEL.nivel!=='admin') return;
   mcpoBotaoPasta();
@@ -907,6 +911,7 @@ const PASTAS_ACESSO=[
   { nome:'Pecas Varejo',         caminho:'Pecas Varejo',            area:'fat' },
   { nome:'assistencia',          caminho:CAMINHOS.ast.pasta,         area:'ast' },
   { nome:'Execução de Montagem', caminho:CAMINHOS.obr.pasta,         area:'obr' },
+  { nome:'Entrega Técnica',      caminho:CAMINHOS.ent.pasta,         area:'ent' },
   { nome:'Orçamentos Montagem',  caminho:'Orçamentos Montagem',      area:'orc' },
   { nome:'CRM SAM',              link:CAMINHOS.sam.link, caminho:CAMINHOS.sam.pasta, area:'sam' },
   { nome:'Compras-estoque',      caminho:CAMINHOS.cmp.pasta,         area:'cmp' },
@@ -1258,6 +1263,36 @@ window.__painelResumoObr=function(){ try{
   window.parent.postMessage({tipo:'resumo', resumo:r},'*');
 }catch(e){ console.error('[painel] resumo obras', e); } };
 window.addEventListener('load',function(){ setTimeout(window.__painelResumoObr,300); });
+<\/script>`; return i>=0 ? html.slice(0,i)+js+html.slice(i) : html+js; },
+  },
+  ent: {
+    /* Entrega Técnica: o app abre em modo visualização com os dados lidos pelo painel; todas as páginas (Entregas,
+       Financeiro e Resultados) viram o submenu; o card usa as contas do próprio app (etapa, prazo, pivôs, mediana) */
+    storage: d=>({ 'mcpo-entrega-tecnica-v1': JSON.stringify(d.estado) }),
+    extra: d=>({ obras:d.obras }),
+    css: CSS_SEM_CABECALHO+` #btn-nova,.acao-btn,[data-saldo],#tabs button[data-tab="parametros"],.overlay{display:none!important}`,
+    menu: MENU_ABAS, controles: null,
+    init: `nivelAcesso=function(){return 'comum'}; OBRAS=window.__PAINEL.extra.obras||[];
+      setMod=function(m,semAba){ MOD=m; document.querySelectorAll('#tabs button').forEach(function(b){ b.style.display=b.dataset.tab==='parametros'?'none':''; }); if(!semAba) irAba(MOD_TABS[m][0]); };
+      setMod(MOD,true); irAba('painel');`,
+    refresh: `state=normalizeState(JSON.parse(localStorage.getItem('mcpo-entrega-tecnica-v1'))); OBRAS=window.__PAINEL.extra.obras||[]; renderAll(); if(window.__painelResumoEnt) __painelResumoEnt();`,
+    patch: html=>{ const i=html.lastIndexOf('</body>'); const js=`<script>
+window.__painelResumoEnt=function(){ try{
+  var todas=todasComVirtuais(), r={meses:{}, anos:{}, aberto:{qtd:0,atr:0,porEtapa:{}}, receber:{qtd:0,val:0,atr:0}, nomes:{}};
+  ETAPAS.forEach(function(x){ r.nomes[x.id]=x.nome; });
+  var mes=function(k){ return r.meses[k]||(r.meses[k]={conc:0,piv:0,pagQ:0,pagV:0}); };
+  todas.forEach(function(e){ var et=etapa(e);
+    if(ABERTAS.indexOf(et)>=0){ r.aberto.qtd++; r.aberto.porEtapa[et]=(r.aberto.porEtapa[et]||0)+1; if(prazo(e).st==='atrasada') r.aberto.atr++; }
+    if(e.virtual) return;
+    if(e.termino){ var a=String(e.termino).slice(0,4), m=mes(String(e.termino).slice(0,7)); m.conc++; m.piv+=pivosConta(e);
+      var y=r.anos[a]||(r.anos[a]={conc:0,piv:0,ciclos:[]}); y.conc++; y.piv+=pivosConta(e); if(e.pagamento) y.ciclos.push(difDias(e.termino,e.pagamento)); }
+    if(et==='paga' && e.pagamento){ var p=mes(String(e.pagamento).slice(0,7)); p.pagQ++; p.pagV+=nNum(e.valor); }
+    if(et==='pagamento'){ r.receber.qtd++; r.receber.val+=nNum(e.valor); if(prazo(e).st==='atrasada') r.receber.atr++; }
+  });
+  Object.keys(r.anos).forEach(function(a){ r.anos[a].ciclo=mediana(r.anos[a].ciclos); delete r.anos[a].ciclos; });
+  window.parent.postMessage({tipo:'resumo', resumo:r},'*');
+}catch(e){ console.error('[painel] resumo entregas', e); } };
+window.addEventListener('load',function(){ setTimeout(window.__painelResumoEnt,400); });
 <\/script>`; return i>=0 ? html.slice(0,i)+js+html.slice(i) : html+js; },
   },
   crm: {
@@ -1780,6 +1815,31 @@ CARREGADORES.obr = async ()=>{
   if(o.missing && l.missing) throw new Error('arquivos de Obras não encontrados');
   return { clientes:itens(c), obras:itens(o), lancamentos:itens(l), alocacoes:itens(a), tecnicos:itens(t), listasBrutas:(ls&&ls.data)||null,
            listas:Object.assign({status:[],regionais:[],categorias:[],categoriasSemCusto:[]}, (ls&&ls.data)||{}) };
+};
+
+/* =====================================================================
+   ENTREGA TÉCNICA — mesmos arquivos do módulo (Entrega Técnica › _dados)
+   ===================================================================== */
+CARREGADORES.ent = async ()=>{
+  const p=CAMINHOS.ent;
+  const [d,o]=await Promise.all([ lerJsonSP(p.pasta,p.dados), lerJsonSP(p.pasta,p.obras).catch(()=>({data:null})) ]);
+  if(d.missing || !d.data) throw new Error('arquivo de Entrega Técnica não encontrado');
+  return { estado:d.data, obras:(o&&o.data&&Array.isArray(o.data.itens))?o.data.itens:[] };
+};
+RESUMO.ent = ()=>{
+  const R=FONTES.ent.dados.resumo;
+  if(!R) return { kpis:[{ l:'Concluídas no mês', v:'…', s:'calculando com as regras do app' },{ l:'Recebido no mês', v:'…' },{ l:'Em aberto agora', v:'…' }] };
+  const m=Object.assign({conc:0,piv:0,pagQ:0,pagV:0}, R.meses[FILTRO.ym]||{}), ano=FILTRO.ym.slice(0,4), a=Object.assign({conc:0,piv:0,ciclo:null}, R.anos[ano]||{});
+  const pe=R.aberto.porEtapa||{}, nome=id=>(R.nomes&&R.nomes[id])||id;
+  const rodape=['pendente','andamento','envio','fabrica','pagamento'].filter(id=>pe[id]).map(id=>int(pe[id])+' '+nome(id).toLowerCase()).join(' · ') || 'nenhuma entrega em aberto';
+  return { kpis:[
+    { l:'Concluídas no mês', v:int(m.conc), s:int(m.piv)+' pivô(s) entregue(s)' },
+    { l:'Recebido no mês', v:brl0(m.pagV), cls:m.pagV>0?'pos':'', s:int(m.pagQ)+' entrega(s) paga(s)' },
+    { l:'Em aberto agora', v:int(R.aberto.qtd), cls:R.aberto.atr?'neg':'', s:int(R.aberto.atr)+' atrasada(s)' },
+    { l:'A receber', v:brl0(R.receber.val), cls:R.receber.atr?'neg':'', s:int(R.receber.qtd)+' aguardando pagamento · '+int(R.receber.atr)+' atrasada(s)' },
+    { l:'Concluídas em '+ano, v:int(a.conc), s:int(a.piv)+' pivô(s) entregue(s)' },
+    { l:'Término → pagamento', v:a.ciclo==null?'—':Math.round(a.ciclo)+' dias', s:'mediana das concluídas em '+ano },
+  ], rodape };
 };
 
 function moduloObr(dados){

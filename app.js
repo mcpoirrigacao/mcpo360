@@ -25,7 +25,7 @@ const GRAPH = 'https://graph.microsoft.com/v1.0';
 const BASE = typeof location !== 'undefined' ? location.origin + location.pathname.replace(/[^/]*$/, '') : '';
 const REDIRECT = BASE;   // https://mcpoirrigacao.github.io/mcpo360/ (cadastrado no Azure)
 const REG = '_mcpo_permissoes.json';
-const VERSAO = '202611261030';   // muda a cada publicação: força o navegador a buscar os módulos novos
+const VERSAO = '202611261500';   // muda a cada publicação: força o navegador a buscar os módulos novos
 
 /* ---------------- módulos ----------------
    niveis: do mais alto para o mais baixo.
@@ -36,7 +36,7 @@ const LINK_CRMSAM = 'https://maqcampoirrigacao.sharepoint.com/:f:/s/MCPOIRRIGACA
 const MODULOS = [
   { id: 'painel', dir: 'painel', sigla: 'PA', curto: 'Painel', nome: 'Painel 360', grupo: 'Visão', desc: 'Visão geral dos apps para a diretoria',
     niveis: ['admin', 'comum'], pasta: { link: LINK_PAINEL, caminhos: ['Painel'] },
-    papel: n => n === 'admin' ? 'write' : 'read', le: () => ['assistencia', 'pecas', 'compras', 'obras', 'orcamento', 'crmsam', 'followup', 'treinamentos'] },
+    papel: n => n === 'admin' ? 'write' : 'read', le: () => ['assistencia', 'pecas', 'compras', 'obras', 'entregas', 'orcamento', 'crmsam', 'followup', 'treinamentos'] },
   { id: 'assistencia', dir: 'assistencia', sigla: 'AT', curto: 'Assist.', nome: 'Assistência Técnica', grupo: 'Operação', desc: 'OS, faturamento e comissão dos técnicos',
     niveis: ['admin', 'comum'], pasta: { caminhos: ['assistencia'] }, papel: () => 'write',
     acesso: [['assistencia', 'assistencia_acesso.json']] },
