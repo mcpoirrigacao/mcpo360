@@ -5171,7 +5171,62 @@ function computeBaseNonfat(){
   Object.keys(DATA.compras && DATA.compras.grid || {}).forEach(function(f){ Object.keys(DATA.compras.grid[f]).forEach(function(m){ s[m]=1; }); });
   return Object.keys(s);
 }
-/* lê as planilhas da pasta; usa o cache local se nenhum arquivo mudou (forcar = ignora o cache) */
+/* ---------- resumo processado na própria pasta (_resumo_processado.json.gz) ----------
+   As planilhas são processadas UMA vez (do zero) quando algum arquivo muda; o resultado vai comprimido para a
+   pasta do SharePoint e todos passam a ler só o resumo. Nada fica gravado no navegador.
+   - a chave do resumo = nome@eTag de cada planilha + mês corrente + versão do cálculo (RESUMO_VER);
+   - só o administrador grava (pasta com edição); quem só lê e encontra o resumo desatualizado processa na hora;
+   - gravação com trava If-Match: se outra pessoa gravou no meio, relê e junta. */
+var RESUMO_ARQ = '_resumo_processado.json.gz';
+var RESUMO_VER = 'r1|' + CACHE_KEY;          /* mudar quando a regra de cálculo mudar → força reprocessar */
+var _resumoMem = null;                        /* {etag, obj} só em memória */
+function gzipOk(){ return typeof CompressionStream !== 'undefined' && typeof DecompressionStream !== 'undefined'; }
+function gunzipJson(buf){
+  return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text().then(function(t){ return JSON.parse(t); });
+}
+function gzipJson(obj){
+  return new Response(new Blob([JSON.stringify(obj)]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+}
+function lerResumo(){
+  var f = acharArquivo(RESUMO_ARQ);
+  if (!f || !gzipOk()) return Promise.resolve(null);
+  if (_resumoMem && _resumoMem.etag === f.eTag) return Promise.resolve(_resumoMem.obj);
+  return baixarArquivo(f).then(gunzipJson).then(function(o){ _resumoMem = {etag:f.eTag, obj:o}; return o; })
+    .catch(function(e){ console.warn('resumo processado ilegível', e); return null; });
+}
+function gravarResumo(mudar, tentativa){
+  if (nivelAcesso() !== 'admin' || !gzipOk() || !pasta) return Promise.resolve(false);
+  tentativa = tentativa || 0;
+  var url = itemUrl(RESUMO_ARQ);
+  return gfetch(url).then(function(meta){
+    if (meta.status === 404) return {obj:{}, etag:null};
+    if (!meta.ok) throw new Error('HTTP '+meta.status);
+    return meta.json().then(function(mj){
+      return gfetch(url+'/content').then(function(c){ if (!c.ok) throw new Error('HTTP '+c.status); return c.arrayBuffer(); })
+        .then(gunzipJson).catch(function(){ return {}; })
+        .then(function(o){ return {obj:o||{}, etag:mj.eTag||null}; });
+    });
+  }).then(function(atual){
+    var obj = atual.obj || {}; mudar(obj);
+    obj.formato = 1; obj.gerado_em = new Date().toISOString(); obj.gerado_por = emailAtual();
+    return gzipJson(obj).then(function(buf){
+      var h = {'Content-Type':'application/gzip'};
+      var u = url + '/content' + (atual.etag ? '' : '?@microsoft.graph.conflictBehavior=fail');
+      if (atual.etag) h['If-Match'] = atual.etag;
+      return gfetch(u, {method:'PUT', headers:h, body:buf}).then(function(r){
+        if ((r.status===412 || r.status===409) && tentativa < 3)
+          return new Promise(function(res){ setTimeout(res, 400 + Math.random()*900); }).then(function(){ return gravarResumo(mudar, tentativa+1); });
+        if (!r.ok){ console.warn('resumo processado: HTTP '+r.status); return false; }
+        return r.json().then(function(j){ _resumoMem = {etag:j.eTag||null, obj:obj}; return true; }).catch(function(){ return true; });
+      });
+    });
+  }).catch(function(e){ console.warn('resumo processado não gravado', e); return false; });
+}
+/* caches antigos no navegador (versões anteriores do app) — apaga */
+try { Object.keys(localStorage).forEach(function(k){ if (/^compras_pecas_cache_v/.test(k)) localStorage.removeItem(k); }); } catch(e){}
+try { indexedDB.deleteDatabase('compras_pecas_cp'); } catch(e){}
+
+/* lê as planilhas da pasta; usa o resumo processado se nenhum arquivo mudou (forcar = processa do zero) */
 function carregarPlanilhas(forcar){
   if (lendo) return Promise.resolve();
   if (typeof XLSX === 'undefined'){ showToast('Não foi possível carregar o leitor de planilhas (sem conexão?).', true); return Promise.resolve(); }
@@ -5185,12 +5240,10 @@ function carregarPlanilhas(forcar){
       if (!sel[k] && ARQ_INFO[k].obrig) faltando.push(params.arquivos[k]);
     });
     if (faltando.length) throw new Error('Arquivo(s) não encontrado(s) na pasta: '+faltando.join(', '));
-    var sig = assinatura(sel);
-    var c = null; try { c = JSON.parse(localStorage.getItem(CACHE_KEY)||'null'); } catch(e){}
-    if (!forcar && c && c.sig===sig && c.data){
-      if (!DATA || DATA.meta.sig!==sig) setData(c.data);
-      return 'cache';
-    }
+    var sig = assinatura(sel), sigR = sig + '#' + RESUMO_VER;
+    if (!forcar && DATA && DATA.meta.sig===sig) return 'cache';
+    return (forcar ? Promise.resolve(null) : lerResumo()).then(function(R){
+    if (R && R.sigBase===sigR && R.base){ setData(R.base); return 'resumo'; }
     setSyncStatus('⏳ lendo planilhas…','saving');
     var chaves = Object.keys(sel).filter(function(k){ return sel[k]; });
     return Promise.all(chaves.map(function(k){ return baixarArquivo(sel[k]); })).then(function(bufs){
@@ -5203,14 +5256,14 @@ function carregarPlanilhas(forcar){
           invData: dataSP(sel.inventario.lastModifiedDateTime) || hojeSP(), hoje: hojeSP(), agora: todayStr(), fontes: fontes });
         base.meta.sig = sig;
         base.meta.arquivos = chaves.map(function(k){ return {chave:k, nome:sel[k].name, modificado:sel[k].lastModifiedDateTime, tamanho:sel[k].size}; });
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify({sig:sig, data:base})); } catch(e){}
         setData(base);
-        return 'lido';
+        return gravarResumo(function(o){ o.sigBase = sigR; o.base = base; }).then(function(ok){ return ok ? 'gravado' : 'lido'; });
       });
+    });
     });
   }).then(function(modo){
     ultimaLeitura = new Date();
-    setSyncStatus(modo==='lido' ? '☁ planilhas lidas agora' : '☁ conectado','ok');
+    setSyncStatus(modo==='gravado' ? '☁ planilhas processadas e resumo salvo' : modo==='lido' ? '☁ planilhas lidas agora' : '☁ conectado','ok');
     if (forcar) showToast('Planilhas recarregadas da pasta.');
   }).catch(function(e){
     console.error(e); erroLeitura = e.message || String(e);
@@ -5269,8 +5322,10 @@ function carregarCompras(forcar){
   if (currentTab==='compras' && !CP.temDados()) cpAtualizarAba();
   var meta = { sig:sig, arquivo:{nome:sel.compras.name, modificado:sel.compras.lastModifiedDateTime, tamanho:sel.compras.size},
                historico: sel.historico ? sel.historico.name : '', filiais: sel.filiais ? sel.filiais.name : '' };
-  return (forcar ? Promise.resolve(null) : cpCacheLer()).then(function(c){
-    if (c && c.sig===sig && c.data) return {data:c.data, hist:c.hist, meta:c.meta, modo:'cache'};
+  var sigR = sig + '#' + RESUMO_VER;
+  return (forcar ? Promise.resolve(null) : lerResumo()).then(function(R){
+    var c = R && R.sigCP===sigR && R.cp;
+    if (c && c.data) return {data:c.data, hist:c.hist, meta:c.meta, modo:'resumo'};
     setSyncStatus('⏳ lendo pedidos de compra…','saving');
     return Promise.all([ baixarArquivo(sel.compras), sel.historico ? baixarArquivo(sel.historico) : null, sel.filiais ? baixarArquivo(sel.filiais) : null ])
       .then(function(bufs){
@@ -5278,8 +5333,8 @@ function carregarCompras(forcar){
           var wbH = bufs[1] ? XLSX.read(bufs[1], {type:'array'}) : null;
           var r = CP.processar(bufs[0], wbH, bufs[2]);
           meta.linhas = r.data.meta.rowCount; meta.lido_em = new Date().toISOString();
-          cpCacheGravar({sig:sig, data:r.data, hist:r.hist, meta:meta});
-          return {data:r.data, hist:r.hist, meta:meta, modo:'lido'};
+          return gravarResumo(function(o){ o.sigCP = sigR; o.cp = {data:r.data, hist:r.hist, meta:meta}; })
+            .then(function(){ return {data:r.data, hist:r.hist, meta:meta, modo:'lido'}; });
         });
       });
   }).then(function(r){
@@ -5423,8 +5478,7 @@ function resetAuthState(){
   params = { arquivos: clone(ARQ_PADRAO) };
   acesso = { emailsAutorizados:[], emailsComuns:[] }; acessoOk = false; acessoEtag = null; acessoLegado = null;
   clearInterval(_pollTimer);
-  try { localStorage.removeItem(CACHE_KEY); } catch(e){}
-  cpCacheLimpar(); cpSig = null; cpErro = ''; CP.setDados(null); cpAtualizarAba();
+  _resumoMem = null; cpSig = null; cpErro = ''; CP.setDados(null); cpAtualizarAba();
   setSyncStatus('','');
 }
 function fazerLogin(){

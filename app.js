@@ -25,7 +25,7 @@ const GRAPH = 'https://graph.microsoft.com/v1.0';
 const BASE = typeof location !== 'undefined' ? location.origin + location.pathname.replace(/[^/]*$/, '') : '';
 const REDIRECT = BASE;   // https://mcpoirrigacao.github.io/mcpo360/ (cadastrado no Azure)
 const REG = '_mcpo_permissoes.json';
-const VERSAO = '202611251200';   // muda a cada publicação: força o navegador a buscar os módulos novos
+const VERSAO = '202611261000';   // muda a cada publicação: força o navegador a buscar os módulos novos
 
 /* ---------------- módulos ----------------
    niveis: do mais alto para o mais baixo.
@@ -358,6 +358,107 @@ function rota() {
 let FORM = { email: '', mods: {}, editando: false };
 let FILTRO = '';
 let PROGRESSO = '';
+
+/* ---------------- armazenamento: tamanho dos arquivos + backup mensal ----------------
+   - Medição: lista os arquivos de cada pasta (só leitura) e avisa quando um arquivo de dados passa de LIMITE_MB.
+   - Backup mensal: uma vez por mês, um administrador da Central copia (cópia feita pelo próprio SharePoint)
+     os arquivos de dados .json de cada pasta para <pasta>/backups/AAAA-MM/. Controle em MCPO360/backup_mensal.json. */
+const LIMITE_MB = 3;
+const SUB_IGNORAR = /^(backups?|uso|clientes|confirmacoes|convites)$/i;
+let ARMAZ = null, ARMAZ_LENDO = false, BACKUP_INFO = null;
+const ehDado = n => /\.json$/i.test(n);
+const mesSP = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit' }).format(new Date()).slice(0, 7);
+const fmtTam = b => b >= 1048576 ? (b / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+async function listarArquivos(url, pref, nivel) {
+  const out = []; let next = acao(url, 'children') + '?$select=id,name,size,file,folder,lastModifiedDateTime,parentReference&$top=999';
+  while (next) {
+    const r = await g(next); if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    for (const it of j.value || []) {
+      if (it.file) out.push({ nome: pref + it.name, tam: it.size || 0, mod: it.lastModifiedDateTime, id: it.id, driveId: it.parentReference && it.parentReference.driveId });
+      else if (it.folder && nivel < 1 && !SUB_IGNORAR.test(it.name) && it.parentReference) out.push(...await listarArquivos(`${GRAPH}/drives/${it.parentReference.driveId}/items/${it.id}`, pref + it.name + '/', nivel + 1));
+    }
+    next = j['@odata.nextLink'] || null;
+  }
+  return out;
+}
+function pastasArmaz() { return [{ id: 'mcpo360', nome: 'MCPO 360 (Central)' }].concat(MODULOS.filter(m => m.pasta).map(m => ({ id: m.id, nome: m.nome }))); }
+async function medirArmazenamento() {
+  if (ARMAZ_LENDO) return; ARMAZ_LENDO = true;
+  const res = [];
+  for (const p of pastasArmaz()) {
+    try { const u = await urlPasta(p.id); if (!u) { res.push({ ...p, erro: 'pasta não encontrada' }); continue; } res.push({ ...p, arquivos: await listarArquivos(u, '', 0) }); }
+    catch (e) { res.push({ ...p, erro: e.message }); }
+  }
+  ARMAZ = { em: new Date().toISOString(), pastas: res }; ARMAZ_LENDO = false;
+  return ARMAZ;
+}
+const acimaDoLimite = () => ARMAZ ? ARMAZ.pastas.flatMap(p => (p.arquivos || []).filter(a => ehDado(a.nome) && a.tam > LIMITE_MB * 1048576).map(a => p.nome + ' › ' + a.nome)) : [];
+async function pastaFilha(paiUrl, nome) {
+  const c = await g(acao(paiUrl, 'children'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: nome, folder: {}, '@microsoft.graph.conflictBehavior': 'fail' }) });
+  if (!c.ok && c.status !== 409) throw new Error('criar ' + nome + ': HTTP ' + c.status);
+  const r = await g(filho(paiUrl, nome)); if (!r.ok) throw new Error('ler ' + nome + ': HTTP ' + r.status);
+  const j = await r.json(); return { url: `${GRAPH}/drives/${j.parentReference.driveId}/items/${j.id}`, driveId: j.parentReference.driveId, id: j.id };
+}
+async function backupMensal(forcar) {
+  if (!ehAdminCentral()) return null;
+  const mes = mesSP(); const ctrlUrl = filho(await urlPasta('mcpo360'), 'backup_mensal.json');
+  const r = await lerJson(ctrlUrl); if (!r.ok) return null;
+  const ctrl = Object.assign({ meses: {} }, r.data || {}); BACKUP_INFO = ctrl;
+  if (ctrl.meses[mes] && !forcar) return ctrl;
+  const pastas = {};
+  for (const p of pastasArmaz()) {
+    let ok = 0, erro = 0;
+    try {
+      const u = await urlPasta(p.id); if (!u) continue;
+      const arqs = (await listarArquivos(u, '', 0)).filter(a => ehDado(a.nome) && a.id && a.driveId);
+      if (!arqs.length) continue;
+      const dest = await pastaFilha((await pastaFilha(u, 'backups')).url, mes);
+      for (const a of arqs) {
+        const c = await g(`${GRAPH}/drives/${a.driveId}/items/${a.id}/copy?@microsoft.graph.conflictBehavior=replace`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ parentReference: { driveId: dest.driveId, id: dest.id }, name: a.nome.replace(/\//g, '__') }) });
+        if (c.status === 202 || c.ok) ok++; else erro++;
+      }
+    } catch (e) { erro++; console.warn('backup', p.id, e); }
+    pastas[p.id] = { arquivos: ok, erros: erro };
+  }
+  ctrl.meses[mes] = { em: new Date().toISOString(), por: emailAtual(), pastas };
+  const w = await gravarJson(ctrlUrl, ctrl, r.etag);
+  if (w.ok) BACKUP_INFO = ctrl;
+  return ctrl;
+}
+async function rotinaArmazenamento() {
+  if (!ehAdminCentral()) return;
+  try { await backupMensal(); } catch (e) { console.warn('backup mensal', e); }
+  try { await medirArmazenamento(); } catch (e) { console.warn('medição', e); }
+  const al = acimaDoLimite();
+  if (al.length) toast(`⚠ ${al.length} arquivo(s) de dados acima de ${LIMITE_MB} MB — veja "Armazenamento" na Central de acessos.`, 9000);
+  if (!$('tela-central').hidden) renderCentral();
+}
+function htmlArmazenamento() {
+  const bi = BACKUP_INFO && BACKUP_INFO.meses ? Object.keys(BACKUP_INFO.meses).sort().reverse() : [];
+  const ult = bi.length ? BACKUP_INFO.meses[bi[0]] : null;
+  const totBk = ult ? Object.values(ult.pastas || {}).reduce((a, x) => a + (x.arquivos || 0), 0) : 0;
+  const errBk = ult ? Object.values(ult.pastas || {}).reduce((a, x) => a + (x.erros || 0), 0) : 0;
+  let h = `<div class="secao"><div class="form-linha" style="justify-content:space-between"><h2>Armazenamento</h2><div class="acoes"><button class="btn" id="a-medir" type="button">${ARMAZ_LENDO ? 'Medindo…' : 'Medir agora'}</button><button class="btn" id="a-backup" type="button">Fazer backup agora</button></div></div><div class="cartao">`;
+  h += `<p class="nota" style="margin:0 0 10px">Arquivos de dados (.json) acima de <b>${LIMITE_MB} MB</b> ficam em destaque: é o sinal para separar os movimentos por ano naquele módulo. Planilhas de origem (Excel/CSV) só são lidas quando os dados mudam e não entram no alerta. `
+    + (ult ? `Último backup mensal: <b>${esc(bi[0])}</b> em ${esc(new Date(ult.em).toLocaleString('pt-BR'))} por ${esc(ult.por)} — ${totBk} arquivo(s) copiados para <i>backups/${esc(bi[0])}</i> de cada pasta${errBk ? `, <b style="color:var(--erro,#b3261e)">${errBk} erro(s)</b>` : ''}.` : 'Backup mensal: ainda não feito (roda sozinho quando um administrador da Central abre o MCPO 360).') + `</p>`;
+  if (!ARMAZ) h += `<p class="nota">${ARMAZ_LENDO ? 'Medindo as pastas…' : 'Clique em <b>Medir agora</b> para ver o tamanho dos arquivos.'}</p>`;
+  else {
+    const lim = LIMITE_MB * 1048576;
+    h += `<table class="t"><thead><tr><th>Pasta</th><th>Arquivos de dados</th><th style="text-align:right">Total dados</th><th>Maior arquivo de dados</th><th style="text-align:right">Planilhas / outros</th></tr></thead><tbody>`;
+    ARMAZ.pastas.forEach(p => {
+      if (p.erro) { h += `<tr><td><b>${esc(p.nome)}</b></td><td colspan="4" class="nota">${esc(p.erro)}</td></tr>`; return; }
+      const d = p.arquivos.filter(a => ehDado(a.nome)), o = p.arquivos.filter(a => !ehDado(a.nome));
+      const td = d.reduce((a, x) => a + x.tam, 0), to = o.reduce((a, x) => a + x.tam, 0);
+      const mx = d.slice().sort((a, b) => b.tam - a.tam)[0];
+      const alto = mx && mx.tam > lim;
+      h += `<tr${alto ? ' style="background:#fdecea"' : ''}><td><b>${esc(p.nome)}</b></td><td>${d.length}</td><td style="text-align:right">${fmtTam(td)}</td><td>${mx ? `${alto ? '⚠ ' : ''}${esc(mx.nome)} · <b>${fmtTam(mx.tam)}</b>` : '—'}</td><td style="text-align:right">${o.length ? `${o.length} · ${fmtTam(to)}` : '—'}</td></tr>`;
+    });
+    h += `</tbody></table><p class="nota" style="margin:8px 0 0">Medido em ${esc(new Date(ARMAZ.em).toLocaleString('pt-BR'))}. Não entram as subpastas backups, uso, Clientes, confirmacoes e convites.</p>`;
+  }
+  return h + `</div></div>`;
+}
+
 function renderCentral() {
   const el = $('tela-central');
   const us = ACESSOS ? Object.entries(ACESSOS.usuarios).sort((a, b) => a[0].localeCompare(b[0])) : [];
@@ -383,6 +484,7 @@ function renderCentral() {
     <div class="cartao tabela-box"><table class="t"><thead><tr><th>E-mail</th>${todos.map(m => `<th title="${esc(m.nome)}">${esc(m.curto || m.nome)}</th>`).join('')}<th><span class="sr">Ações</span></th></tr></thead><tbody>
     ${vis.length ? vis.map(([e, u]) => `<tr><td><b>${esc(e)}</b></td>${todos.map(m => { const n = (u.modulos || {})[m.id]; return n ? `<td class="${n === 'admin' ? 'adm' : ''}">${esc(ROTULO[n] || n)}</td>` : '<td class="vazio">—</td>'; }).join('')}<td style="white-space:nowrap"><button class="btn pequeno" data-editar="${esc(e)}" type="button">editar</button> <button class="btn pequeno perigo" data-remover="${esc(e)}" type="button">remover</button></td></tr>`).join('') : `<tr><td colspan="${todos.length + 2}" class="vazio">Ninguém cadastrado.</td></tr>`}
     </tbody></table></div></div>`;
+  h += htmlArmazenamento();
   const hist = (ACESSOS && ACESSOS.historico) || [];
   h += `<div class="secao"><h2>Histórico</h2><div class="cartao">${hist.length ? hist.slice(0, 40).map(x => `<div class="hist">${esc(new Date(x.em).toLocaleString('pt-BR'))} · <b>${esc(x.por)}</b> ${esc(x.txt)}</div>`).join('') : '<span class="nota">Sem alterações ainda.</span>'}</div></div>`;
   el.innerHTML = h;
@@ -398,6 +500,8 @@ function renderCentral() {
   el.querySelectorAll('[data-editar]').forEach(b => b.onclick = () => { const e = b.dataset.editar; FORM = { email: e, mods: Object.assign({}, ACESSOS.usuarios[e].modulos), editando: true }; renderCentral(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
   el.querySelectorAll('[data-remover]').forEach(b => b.onclick = () => removerPessoa(b.dataset.remover));
   $('c-importar').onclick = importarListas;
+  $('a-medir').onclick = async () => { const p = medirArmazenamento(); renderCentral(); await p; renderCentral(); };
+  $('a-backup').onclick = async () => { const b = $('a-backup'); b.disabled = true; b.textContent = 'Copiando…'; try { await backupMensal(true); toast('Backup do mês feito.'); } catch (e) { toast('Backup: ' + e.message); } renderCentral(); };
   $('c-sync').onclick = () => sincronizar({ forcar: true, explicito: true });
   $('c-csv').onclick = exportarCsv;
   $('crm-salvar').onclick = salvarSenhaCrm;
@@ -666,6 +770,7 @@ async function depoisDoLogin() {
   await carregarAcessos(); recalcular();
   const f = funcoes(); $('quem-papel').textContent = f.includes('MCPO.Admin') ? 'Admin geral · Azure' : ehAdminCentral() ? 'Admin da Central' : meusModulos().length + ' módulo(s)';
   rota();
+  if (ehAdminCentral()) setTimeout(() => rotinaArmazenamento(), 6000);
 }
 async function iniciar() {
   // janela de login (popup) voltando para cá: só deixa a janela principal ler a resposta
