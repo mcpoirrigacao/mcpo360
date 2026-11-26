@@ -25,7 +25,7 @@ const GRAPH = 'https://graph.microsoft.com/v1.0';
 const BASE = typeof location !== 'undefined' ? location.origin + location.pathname.replace(/[^/]*$/, '') : '';
 const REDIRECT = BASE;   // https://mcpoirrigacao.github.io/mcpo360/ (cadastrado no Azure)
 const REG = '_mcpo_permissoes.json';
-const VERSAO = '202611261000';   // muda a cada publicação: força o navegador a buscar os módulos novos
+const VERSAO = '202611261030';   // muda a cada publicação: força o navegador a buscar os módulos novos
 
 /* ---------------- módulos ----------------
    niveis: do mais alto para o mais baixo.
@@ -45,6 +45,8 @@ const MODULOS = [
     acesso: [['Pecas Varejo', 'pecas_varejo_acesso.json'], ['Pecas Varejo', 'faturamento_acesso.json'], ['Faturamento', 'faturamento_acesso.json']] },
   { id: 'compras', dir: 'compras', sigla: 'CE', curto: 'Compras', nome: 'Compras e estoque', grupo: 'Operação', desc: 'BI de compras e estoque de peças',
     niveis: ['admin', 'comum'], pasta: { caminhos: ['Compras-estoque'] }, papel: n => n === 'admin' ? 'write' : 'read',
+    /* quem só lê a pasta pode gravar este arquivo: o primeiro que abrir depois da troca das planilhas atualiza o resumo */
+    arquivosEditaveis: ['_resumo_processado.json.gz'],
     acesso: [['Compras-estoque', 'compras_pecas_acesso.json']] },
   { id: 'orcamento', dir: 'orcamento', sigla: 'OR', curto: 'Orçam.', nome: 'Orçamentação', grupo: 'Operação', desc: 'Orçamento de montagem de pivôs',
     niveis: ['admin', 'gestor', 'comum'], pasta: { caminhos: ['Orçamentos Montagem/Historico_montagem'] }, papel: () => 'write',
@@ -661,6 +663,16 @@ async function _sincronizar({ forcar, explicito }) {
     for (const em of retirarLista) {
       const r = await retirar(url, em);
       if (r.ok) { delete tem[em]; rt++; mudou = true; } else falhas.push(`${nome} · ${em}: ${r.msg}`);
+    }
+    /* arquivos que quem só lê a pasta também grava (ex.: resumo processado do Compras-estoque) */
+    for (const arq of (MOD[chave] && MOD[chave].arquivosEditaveis) || []) {
+      const fUrl = filho(url, arq);
+      try { const ex = await g(fUrl); if (!ex.ok) { if (ex.status !== 404) falhas.push(`${nome} › ${arq}: HTTP ${ex.status}`); continue; } } catch (e) { continue; }
+      const querArq = Object.fromEntries(Object.entries(quer[chave] || {}).filter(([, p]) => p === 'read').map(([em]) => [em, 'write']));
+      const temArq = (reg.pastas['arq:' + arq] = reg.pastas['arq:' + arq] || {});
+      const pa = planejarPasta(temArq, querArq, forcar);
+      for (const [em, papel] of pa.liberar) { const r = await conceder(fUrl, em, papel); if (r.ok) { if (temArq[em] !== papel) l++; temArq[em] = papel; mudou = true; } else falhas.push(`${nome} › ${arq} · ${em}: ${r.msg}`); }
+      for (const em of pa.retirar) { const r = await retirar(fUrl, em); if (r.ok) { delete temArq[em]; rt++; mudou = true; } else falhas.push(`${nome} › ${arq} · ${em}: ${r.msg}`); }
     }
     if (mudou) { reg.atualizadoEm = new Date().toISOString(); reg.atualizadoPor = emailAtual(); reg.origem = 'MCPO 360'; await gravarJson(regUrl, reg, regEtag); }
     lib += l; ret += rt; if (l || rt) linhas.push(`${nome}: ${l} liberado(s), ${rt} retirado(s)`);

@@ -5175,11 +5175,12 @@ function computeBaseNonfat(){
    As planilhas são processadas UMA vez (do zero) quando algum arquivo muda; o resultado vai comprimido para a
    pasta do SharePoint e todos passam a ler só o resumo. Nada fica gravado no navegador.
    - a chave do resumo = nome@eTag de cada planilha + mês corrente + versão do cálculo (RESUMO_VER);
-   - só o administrador grava (pasta com edição); quem só lê e encontra o resumo desatualizado processa na hora;
+   - qualquer pessoa com acesso ao módulo grava o resumo (a Central libera edição só neste arquivo para quem lê a pasta);
    - gravação com trava If-Match: se outra pessoa gravou no meio, relê e junta. */
 var RESUMO_ARQ = '_resumo_processado.json.gz';
 var RESUMO_VER = 'r1|' + CACHE_KEY;          /* mudar quando a regra de cálculo mudar → força reprocessar */
 var _resumoMem = null;                        /* {etag, obj} só em memória */
+var _resumoSemPermissao = false;              /* 403 ao gravar: não tenta de novo nesta sessão */
 function gzipOk(){ return typeof CompressionStream !== 'undefined' && typeof DecompressionStream !== 'undefined'; }
 function gunzipJson(buf){
   return new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text().then(function(t){ return JSON.parse(t); });
@@ -5195,7 +5196,8 @@ function lerResumo(){
     .catch(function(e){ console.warn('resumo processado ilegível', e); return null; });
 }
 function gravarResumo(mudar, tentativa){
-  if (nivelAcesso() !== 'admin' || !gzipOk() || !pasta) return Promise.resolve(false);
+  var nv = nivelAcesso();
+  if ((nv !== 'admin' && nv !== 'comum') || _resumoSemPermissao || !gzipOk() || !pasta) return Promise.resolve(false);
   tentativa = tentativa || 0;
   var url = itemUrl(RESUMO_ARQ);
   return gfetch(url).then(function(meta){
@@ -5216,6 +5218,7 @@ function gravarResumo(mudar, tentativa){
       return gfetch(u, {method:'PUT', headers:h, body:buf}).then(function(r){
         if ((r.status===412 || r.status===409) && tentativa < 3)
           return new Promise(function(res){ setTimeout(res, 400 + Math.random()*900); }).then(function(){ return gravarResumo(mudar, tentativa+1); });
+        if (r.status===403 || r.status===401){ _resumoSemPermissao = true; console.warn('resumo processado: sem permissão para gravar'); return false; }
         if (!r.ok){ console.warn('resumo processado: HTTP '+r.status); return false; }
         return r.json().then(function(j){ _resumoMem = {etag:j.eTag||null, obj:obj}; return true; }).catch(function(){ return true; });
       });
