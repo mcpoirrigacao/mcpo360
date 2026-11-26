@@ -1198,7 +1198,7 @@ window.addEventListener('load',function(){ setTimeout(window.__painelResumoEnt,4
   cmp: {
     /* Compras-estoque lê planilhas Excel/CSV da pasta; o painel baixa as planilhas e entrega ao quadro */
     storage: ()=>({}),
-    graph: d=>({ pasta:'Compras-estoque', email:emailAtual(), lista:d.lista, bin:Object.keys(d.binarios),
+    graph: d=>({ pasta:'Compras-estoque', email:emailAtual(), lista:d.lista, bin:Object.keys(d.itensBin||d.binarios||{}),
       arquivos:{ 'compras_pecas_acesso.json':{ emailsAutorizados:[], emailsComuns:[emailAtual()] }, 'compras_pecas_parametros.json':d.params||{} } }),
     binarios: d=>d.binarios,
     css: `.topbar,.period-band,#btn-ms-login,#update-data-btn,#overlay-login,#overlay-negado{display:none!important}`,
@@ -1243,8 +1243,11 @@ function embedBoot(){
     Object.keys(P.storage||{}).forEach(function(k){ mem[k]=P.storage[k]; });
     Object.defineProperty(window,'localStorage',{value:fazStorage(mem),configurable:true});
     Object.defineProperty(window,'sessionStorage',{value:fazStorage({}),configurable:true});
-    var G=P.graph, versao=1, B_atual={}, resolverBin=null;
-    var binarios=new Promise(function(r){ resolverBin=r; });   /* planilhas enviadas pelo painel depois que o quadro abre */
+    var G=P.graph, versao=1, B_atual={}, esperando=[];
+    function obterBin(f){
+      if(B_atual[f]) return Promise.resolve(B_atual[f]);
+      return new Promise(function(res){ esperando.push({f:f,res:res}); try{ window.parent.postMessage({tipo:'pedirBin', nome:f},'*'); }catch(e){ res(null); } });
+    }
     if(G){
       /* login "de mentira" com o e-mail de quem está no painel */
       var conta={username:G.email,name:G.email,homeAccountId:'painel'};
@@ -1267,9 +1270,9 @@ function embedBoot(){
         var m=url.match(/\/items\/PASTA:\/([^:?]+):?(\/content|:\/content)?/);
         if(m){ var f=decodeURIComponent(m[1]), conteudo=!!m[2];
           var meta=(G.lista||[]).filter(function(x){ return x.name===f; })[0];
-          if(G.bin && G.bin.indexOf(f)>=0){   /* planilha: o conteúdo chega do painel por mensagem */
+          if(G.bin && G.bin.indexOf(f)>=0){   /* planilha/resumo: o conteúdo é pedido ao painel só quando o app precisa */
             if(!conteudo) return resp(200,Object.assign({id:f,file:{}},meta||{name:f}));
-            return binarios.then(function(B){ return B[f] ? new Response(B[f].slice(0),{status:200}) : new Response('{}',{status:404}); });
+            return obterBin(f).then(function(b){ return b ? new Response(b.slice(0),{status:200}) : new Response('{}',{status:404}); });
           }
           if(!Object.prototype.hasOwnProperty.call(G.arquivos,f)) return resp(404,{});
           return conteudo?resp(200,G.arquivos[f]):resp(200,{id:f,name:f,eTag:'"painel-'+versao+'"'}); }
@@ -1280,6 +1283,9 @@ function embedBoot(){
       /* login Microsoft do app desligado: ele abre em modo visualização local */
       Object.defineProperty(window,'msal',{value:{PublicClientApplication:function(){ this.initialize=function(){ return Promise.reject(new Error('painel')); }; this.getAllAccounts=function(){ return []; }; }},writable:false,configurable:false});
     }
+    /* os módulos do MCPO 360 pegam o nível em window.top.MCPO360 — no quadro isolado isso não existe; o painel entrega "comum" */
+    window.__PAINEL_MCPO360={ versao:1, nivel:function(){ return 'comum'; }, email:function(){ return (G&&G.email)||''; },
+      usuarios:function(){ return null; }, abrir:function(){}, senhaCrm:function(){ return Promise.resolve(''); }, garantirAcesso:function(){ return Promise.resolve(); } };
     window.alert=function(){}; window.confirm=function(){ return false; }; window.prompt=function(){ return null; };
     document.addEventListener('dragstart',function(e){ e.preventDefault(); },true);
     function rodar(code){ if(!code) return; var s=document.createElement('script'); s.textContent='try{'+code+'}catch(e){console.error("[painel]",e);}'; (document.body||document.documentElement).appendChild(s); s.remove(); }
@@ -1318,8 +1324,9 @@ function embedBoot(){
     window.addEventListener('message',function(ev){
       if(ev.source!==window.parent) return; var d=ev.data||{};
       if(d.tipo==='binarios'){
-        B_atual=d.arquivos||{};
-        if(resolverBin){ resolverBin(B_atual); resolverBin=null; } else { binarios=Promise.resolve(B_atual); }
+        var A=d.arquivos||{}; Object.keys(A).forEach(function(k){ B_atual[k]=A[k]; });
+        var falta=d.faltando||[];
+        esperando=esperando.filter(function(w){ if(B_atual[w.f]){ w.res(B_atual[w.f]); return false; } if(falta.indexOf(w.f)>=0){ w.res(null); return false; } return true; });
         return;
       }
       if(d.tipo==='atualizar'){
@@ -1354,6 +1361,7 @@ function montarSrcdoc(k, html){
   const cfg=EMBED[k];
   const payload=Object.assign(payloadEmbed(k), { init:cfg.init, refresh:cfg.refresh, menu:cfg.menu||null, controles:cfg.controles||null });
   if(cfg.patch) html=cfg.patch(html);
+  if(k!=='crm') html=html.replace(/window\.(top|parent)\.MCPO360/g,'window.__PAINEL_MCPO360');   /* CRM Comercial segue o próprio fluxo (planilha entregue pelo painel) */
   const injeta=`<meta http-equiv="Content-Security-Policy" content="${EMBED_CSP}">`+
     `<script>window.__PAINEL=${jsonSeguro(payload)};(${embedBoot.toString()})();<\/script>`+
     `<style>${EMBED_CSS_COMUM}\n${cfg.css||''}</style>`;
@@ -1393,6 +1401,23 @@ function atualizarEmbed(k){
   _embedVersao[k]=sig;
   try{ if(EMBED[k].binarios) enviarBinarios(k, ifr); ifr.contentWindow.postMessage(Object.assign({tipo:'atualizar'}, payloadEmbed(k)), '*'); }catch(e){ console.error(e); }
 }
+/* o quadro pediu um arquivo (planilha ou resumo): baixa uma vez e guarda junto dos dados da área */
+const _baixando={};
+async function entregarBin(k, ifr, nome){
+  const d=FONTES[k]&&FONTES[k].dados; if(!d||!ifr||!ifr.contentWindow) return;
+  d.binarios=d.binarios||{};
+  try{
+    if(!d.binarios[nome]){
+      const it=(d.itensBin||{})[nome];
+      if(!it){ ifr.contentWindow.postMessage({tipo:'binarios', arquivos:{}, faltando:[nome]}, '*'); return; }
+      const ch=k+'|'+nome+'|'+(it.eTag||'');
+      _baixando[ch]=_baixando[ch]||baixarBinarioSP(it).finally(()=>{ setTimeout(()=>delete _baixando[ch], 1000); });
+      d.binarios[nome]=await _baixando[ch];
+    }
+    const o={}; o[nome]=d.binarios[nome];
+    ifr.contentWindow.postMessage({tipo:'binarios', arquivos:o}, '*');
+  }catch(e){ console.error('arquivo '+nome, e); try{ ifr.contentWindow.postMessage({tipo:'binarios', arquivos:{}, faltando:[nome]}, '*'); }catch(_){} }
+}
 function enviarBinarios(k, ifr){
   const d=FONTES[k].dados; if(!d||!ifr||!ifr.contentWindow||typeof EMBED[k].binarios!=='function') return;
   try{ ifr.contentWindow.postMessage({tipo:'binarios', arquivos:EMBED[k].binarios(d)}, '*'); }catch(e){ console.error(e); }
@@ -1424,6 +1449,7 @@ function quadroDe(k){ const w=document.getElementById('embed-'+k); return w&&w.q
 window.addEventListener('message', ev=>{
   const ifr=[...document.querySelectorAll('iframe[data-area]')].find(f=>f.contentWindow===ev.source);
   if(!ifr) return; const k=ifr.dataset.area, d=ev.data||{};
+  if(d.tipo==='pedirBin'){ entregarBin(k, ifr, d.nome); return; }
   if(ifr.dataset.calc){   /* quadro invisível só para calcular o resumo do card */
     if(d.tipo==='resumo' && FONTES[k] && FONTES[k].dados){ FONTES[k].dados.resumo=d.resumo; if(abaAtiva()==='geral') renderGeral(); setTimeout(()=>ifr.remove(), 500); }
     return;
@@ -2354,11 +2380,15 @@ CARREGADORES.cmp = async ()=>{
   /* mesma busca do app: nome exato, depois sem acento/maiúsculas */
   const norm=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
   const achar=nome=>itens.find(f=>f.name.toLowerCase()===String(nome).trim().toLowerCase()) || itens.find(f=>norm(f.name)===norm(nome));
+  /* planilhas e o resumo processado (_resumo_processado.json.gz) só são baixados quando o app pede:
+     com o resumo em dia, o painel baixa ~0,7 MB em vez das planilhas inteiras */
   const usados=[...new Set(Object.values(nomes).map(achar).filter(Boolean))];
-  const bufs=await Promise.all(usados.map(it=>baixarBinarioSP(it)));
-  const binarios={}; usados.forEach((it,i)=>binarios[it.name]=bufs[i]);
+  const resumo=itens.find(f=>f.name==='_resumo_processado.json.gz'); if(resumo) usados.push(resumo);
+  const itensBin={}; usados.forEach(it=>itensBin[it.name]=it);
+  const anterior=FONTES.cmp.dados, binarios={};
+  if(anterior&&anterior.binarios&&anterior.itensBin) usados.forEach(it=>{ const a=anterior.itensBin[it.name]; if(a&&a.eTag===it.eTag&&anterior.binarios[it.name]) binarios[it.name]=anterior.binarios[it.name]; });
   const faltando=Object.entries(nomes).filter(([k,n])=>!achar(n)).map(([k,n])=>n);
-  return { params, binarios, faltando,
+  return { params, binarios, itensBin, faltando,
     lista:itens.map(f=>({name:f.name, size:f.size, lastModifiedDateTime:f.lastModifiedDateTime, eTag:f.eTag})) };
 };
 RESUMO.cmp = ()=>{
