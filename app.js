@@ -25,7 +25,7 @@ const GRAPH = 'https://graph.microsoft.com/v1.0';
 const BASE = typeof location !== 'undefined' ? location.origin + location.pathname.replace(/[^/]*$/, '') : '';
 const REDIRECT = BASE;   // https://mcpoirrigacao.github.io/mcpo360/ (cadastrado no Azure)
 const REG = '_mcpo_permissoes.json';
-const VERSAO = '202611271055';   // muda a cada publicação: força o navegador a buscar os módulos novos
+const VERSAO = '202611271110';   // muda a cada publicação: força o navegador a buscar os módulos novos
 
 /* ---------------- módulos ----------------
    niveis: do mais alto para o mais baixo.
@@ -116,15 +116,6 @@ function niveisDe(acessos, email, funcoes) {
    Chaves: id do módulo dono da pasta, 'mcpo360' (acessos.json) e 'uso' (registro de uso). */
 /* e-mails que preenchem alguma equipe no FollowUP (Equipes & Campos › Quem preenche) — lido na sincronização */
 let FU_PREENCHE = new Set();
-async function carregarPreenchedoresFU() {
-  try {
-    const u = await urlPasta('followup'); if (!u) return;
-    const r = await lerJson(filho(u, 'followup_dados.json')); if (!r.ok || !r.data) return;
-    const s = new Set();
-    (((r.data.config || {}).equipes) || []).forEach(eq => { if ((eq.tipo || 'manual') === 'manual') (eq.membros || []).forEach(em => s.add(String(em).trim().toLowerCase())); });
-    FU_PREENCHE = s;
-  } catch (e) { console.warn('preenchedores FollowUP', e); }
-}
 function calcularDesejado(acessos) {
   const q = {};
   const por = (chave, email, papel) => {
@@ -642,6 +633,15 @@ async function retirar(url, email) {
     }
     return { ok: true };
   } catch (e) { return { ok: false, msg: 'falha de rede' }; }
+}
+async function carregarPreenchedoresFU() {
+  try {
+    const u = await urlPasta('followup'); if (!u) return;
+    const r = await lerJson(filho(u, 'followup_dados.json')); if (!r.ok || !r.data) return;
+    const s = new Set();
+    (((r.data.config || {}).equipes) || []).forEach(eq => { if ((eq.tipo || 'manual') === 'manual') (eq.membros || []).forEach(em => s.add(String(em).trim().toLowerCase())); });
+    FU_PREENCHE = s;
+  } catch (e) { console.warn('preenchedores FollowUP', e); }
 }
 let _fila = Promise.resolve();
 function sincronizar(o) { _fila = _fila.then(() => _sincronizar(o || {})).catch(e => { toast('Sincronização: ' + e.message); sync(''); }); return _fila; }
