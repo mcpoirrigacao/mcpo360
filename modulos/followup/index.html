@@ -1760,11 +1760,13 @@ async function sincronizarNuvem(silencioso){
   carregarFontes(true);
 }
 let _saveTimer=null;
-function scheduleCloudSave(){if(!msAccount||!nuvemOk||['bloqueado','visualizador','leitor','semnuvem'].includes(nivelAcesso()))return;setSyncStatus('⏳ salvando…','saving');clearTimeout(_saveTimer);_saveTimer=setTimeout(()=>salvarDados(),900);}
+/* visualizador geral que também preenche alguma equipe grava (só consegue editar as próprias equipes: podeEditar) */
+function podeGravarNuvem(){const n_=nivelAcesso();if(['bloqueado','leitor','semnuvem'].includes(n_))return false;if(n_==='visualizador')return state.config.equipes.some(ehMembro);return true;}
+function scheduleCloudSave(){if(!msAccount||!nuvemOk||!podeGravarNuvem())return;setSyncStatus('⏳ salvando…','saving');clearTimeout(_saveTimer);_saveTimer=setTimeout(()=>salvarDados(),900);}
 const espera=ms=>new Promise(r=>setTimeout(r,ms));
 let _retryTimer=null;
 async function salvarDados(){
-  if(!msAccount||!nuvemOk||['bloqueado','visualizador','leitor','semnuvem'].includes(nivelAcesso()))return;
+  if(!msAccount||!nuvemOk||!podeGravarNuvem())return;
   if(salvando){pendente=true;return;} if(!dirtyCount()){setSyncStatus('☁ salvo','ok');return;}
   salvando=true; clearTimeout(_retryTimer); await ensureFolder();
   let ok=false,tent=0,mesclou=false;

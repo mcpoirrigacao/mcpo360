@@ -25,7 +25,7 @@ const GRAPH = 'https://graph.microsoft.com/v1.0';
 const BASE = typeof location !== 'undefined' ? location.origin + location.pathname.replace(/[^/]*$/, '') : '';
 const REDIRECT = BASE;   // https://mcpoirrigacao.github.io/mcpo360/ (cadastrado no Azure)
 const REG = '_mcpo_permissoes.json';
-const VERSAO = '202611271015';   // muda a cada publicação: força o navegador a buscar os módulos novos
+const VERSAO = '202611271050';   // muda a cada publicação: força o navegador a buscar os módulos novos
 
 /* ---------------- módulos ----------------
    niveis: do mais alto para o mais baixo.
@@ -64,8 +64,8 @@ const MODULOS = [
   { id: 'crmcomercial', dir: 'crmcomercial', sigla: 'CC', curto: 'CRM Com.', nome: 'CRM Comercial', grupo: 'Comercial e pessoas', desc: 'CRM MaqCampo (login próprio da planilha)',
     niveis: ['acesso'], rotulos: { acesso: 'Acesso' } },
   { id: 'followup', dir: 'followup', sigla: 'FU', curto: 'FollowUP', nome: 'FollowUP semanal', grupo: 'Comercial e pessoas', desc: 'Acompanhamento semanal por equipe',
-    niveis: ['admin', 'equipe', 'visualizador'], rotulos: { equipe: 'Equipe (conforme FollowUP)', visualizador: 'Visualizador' },
-    pasta: { caminhos: ['FollowUP'] }, papel: n => n === 'visualizador' ? 'read' : 'write', le: () => ['pecas', 'assistencia', 'treinamentos'],
+    niveis: ['admin', 'equipe', 'visualizador'], rotulos: { equipe: 'Equipe (conforme FollowUP)', visualizador: 'Visualizador (todas as equipes; edita as que preenche)' },
+    pasta: { caminhos: ['FollowUP'] }, papel: (n, em) => n === 'visualizador' && !FU_PREENCHE.has(em) ? 'read' : 'write',   /* visualizador que preenche alguma equipe continua gravando */ le: () => ['pecas', 'assistencia', 'treinamentos'],
     acesso: [['FollowUP', 'followup_acesso.json']] },
   { id: 'treinamentos', dir: 'treinamentos', sigla: 'TR', curto: 'Trein.', nome: 'Treinamentos', grupo: 'Comercial e pessoas', desc: 'Treinamentos de funcionários e clientes',
     niveis: ['admin', 'comum'], pasta: { caminhos: ['TreinamentosMCPO'] }, papel: () => 'write',
@@ -114,6 +114,17 @@ function niveisDe(acessos, email, funcoes) {
 }
 /* Pastas que cada pessoa precisa: { chave: { email: 'write'|'read' } }.
    Chaves: id do módulo dono da pasta, 'mcpo360' (acessos.json) e 'uso' (registro de uso). */
+/* e-mails que preenchem alguma equipe no FollowUP (Equipes & Campos › Quem preenche) — lido na sincronização */
+let FU_PREENCHE = new Set();
+async function carregarPreenchedoresFU() {
+  try {
+    const u = await urlPasta('followup'); if (!u) return;
+    const r = await lerJson(filho(u, 'followup_dados.json')); if (!r.ok || !r.data) return;
+    const s = new Set();
+    (((r.data.config || {}).equipes) || []).forEach(eq => { if ((eq.tipo || 'manual') === 'manual') (eq.membros || []).forEach(em => s.add(String(em).trim().toLowerCase())); });
+    FU_PREENCHE = s;
+  } catch (e) { console.warn('preenchedores FollowUP', e); }
+}
 function calcularDesejado(acessos) {
   const q = {};
   const por = (chave, email, papel) => {
@@ -128,7 +139,7 @@ function calcularDesejado(acessos) {
       const m = MOD[id]; if (!m || !m.niveis.includes(nivel)) continue;
       algum = true;
       if (id === 'crmcomercial') por('crmcfg', email, 'read');
-      if (m.pasta && m.papel) por(id, email, m.papel(nivel));
+      if (m.pasta && m.papel) por(id, email, m.papel(nivel, email));
       if (m.le) for (const outro of m.le(nivel)) if (MOD[outro] && MOD[outro].pasta) por(outro, email, 'read');
       if (m.escreve) for (const outro of m.escreve(nivel)) if (MOD[outro] && MOD[outro].pasta) por(outro, email, 'write');
     }
@@ -636,6 +647,7 @@ let _fila = Promise.resolve();
 function sincronizar(o) { _fila = _fila.then(() => _sincronizar(o || {})).catch(e => { toast('Sincronização: ' + e.message); sync(''); }); return _fila; }
 async function _sincronizar({ forcar, explicito }) {
   if (!ehAdminCentral() || !ACESSOS || !Object.keys(ACESSOS.usuarios).length) return;
+  await carregarPreenchedoresFU();
   const quer = calcularDesejado(ACESSOS);
   const chaves = [...MODULOS.filter(m => m.pasta).map(m => m.id), 'mcpo360', 'uso', 'crmcfg'];
   let lib = 0, ret = 0; const falhas = [], pulos = [], linhas = [];
