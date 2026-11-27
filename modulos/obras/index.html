@@ -1040,11 +1040,14 @@ function dataPrevistaConclusao(obra){
   const inicio=dataLocal(obra.dataInicio);
   if(isNaN(inicio))return null;
   let fim=obra.prazoDias?new Date(inicio.getTime()+Number(obra.prazoDias)*86400000):new Date(inicio);
+  /* pausa encerrada empurra a previsão pelo tempo que durou; pausa ainda aberta conta até hoje
+     (ou até a conclusão, se a obra foi concluída sem fechar a pausa) — assim o atraso fica congelado enquanto a obra está parada */
+  const h=new Date(),hoje0=new Date(h.getFullYear(),h.getMonth(),h.getDate());
   (obra.pausas||[]).forEach(p=>{
-    if(p.inicio&&p.fim){
-      const pi=dataLocal(p.inicio),pf=dataLocal(p.fim);
-      if(!isNaN(pi)&&!isNaN(pf)&&pf>pi)fim=new Date(fim.getTime()+(pf.getTime()-pi.getTime()));
-    }
+    if(!p.inicio)return;
+    const pi=dataLocal(p.inicio);
+    const pf=p.fim?dataLocal(p.fim):(obra.concluida&&obra.dataConclusao?dataLocal(obra.dataConclusao):hoje0);
+    if(!isNaN(pi)&&!isNaN(pf)&&pf>pi)fim=new Date(fim.getTime()+(pf.getTime()-pi.getTime()));
   });
   return fim;
 }
@@ -1779,7 +1782,7 @@ function campoHtmlGenerico(campo,valorAtual){
         `<input type="text" id="${idc}__obs" placeholder="Motivo da pausa (opcional)" style="flex:1;min-width:160px;">`+
         `<button type="button" class="btn ghost small" id="${idc}__add">+ Registrar pausa</button>`+
       `</div>`+
-      `<span class="nota">Cada pausa concluída empurra a data prevista de conclusão pelo tempo que durou.</span>`;
+      `<span class="nota">Cada pausa empurra a data prevista de conclusão pelo tempo que durou; pausa em andamento conta até hoje (o atraso não aumenta enquanto a obra está pausada).</span>`;
   }else if(campo.tipo==='codProjetos'){
     inputHtml=`<div id="${idc}__chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;"></div>`+
       `<div style="display:flex;gap:6px;"><input type="text" id="${idc}__novo" inputmode="numeric" placeholder="Nº do projeto" maxlength="12" style="flex:1;min-width:0;">`+

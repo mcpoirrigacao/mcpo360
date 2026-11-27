@@ -1764,7 +1764,7 @@ function moduloObr(dados){
   function dataPrevistaConclusao(obra){
     if(!obra.dataInicio) return null; const inicio=dataLocal(obra.dataInicio); if(isNaN(inicio)) return null;
     let fim=obra.prazoDias?new Date(inicio.getTime()+Number(obra.prazoDias)*86400000):new Date(inicio);
-    (obra.pausas||[]).forEach(p=>{ if(p.inicio&&p.fim){ const pi=dataLocal(p.inicio),pf=dataLocal(p.fim); if(!isNaN(pi)&&!isNaN(pf)&&pf>pi) fim=new Date(fim.getTime()+(pf.getTime()-pi.getTime())); } });
+    (obra.pausas||[]).forEach(p=>{ if(!p.inicio) return; const pi=dataLocal(p.inicio), pf=p.fim?dataLocal(p.fim):(obra.concluida&&obra.dataConclusao?dataLocal(obra.dataConclusao):hoje0); if(!isNaN(pi)&&!isNaN(pf)&&pf>pi) fim=new Date(fim.getTime()+(pf.getTime()-pi.getTime())); });   /* pausa aberta conta até hoje (mesma regra do módulo) */
     return fim;
   }
   function diaEmPausa(obra,dataAtual){
