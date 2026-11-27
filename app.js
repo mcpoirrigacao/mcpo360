@@ -25,7 +25,7 @@ const GRAPH = 'https://graph.microsoft.com/v1.0';
 const BASE = typeof location !== 'undefined' ? location.origin + location.pathname.replace(/[^/]*$/, '') : '';
 const REDIRECT = BASE;   // https://mcpoirrigacao.github.io/mcpo360/ (cadastrado no Azure)
 const REG = '_mcpo_permissoes.json';
-const VERSAO = '202611271050';   // muda a cada publicação: força o navegador a buscar os módulos novos
+const VERSAO = '202611271055';   // muda a cada publicação: força o navegador a buscar os módulos novos
 
 /* ---------------- módulos ----------------
    niveis: do mais alto para o mais baixo.
@@ -756,7 +756,7 @@ window.MCPO360 = {
     email = String(email || '').trim().toLowerCase();
     if (!email || !MOD[mod]) return;
     const atual = ACESSOS && ACESSOS.usuarios[email] && ACESSOS.usuarios[email].modulos[mod];
-    if (atual) return;
+    if (atual) { if (mod === 'followup' && ehAdminCentral()) sincronizar({}); return; }   /* ex.: visualizador virou quem preenche: a pasta passa a edição */
     if (!ehAdminCentral()) { toast(`Peça a um admin da Central para liberar ${email} no ${MOD[mod].nome}.`, 5000); return; }
     const ok = await salvarAcessos(a => { if (!mesclarImportado(a, email, mod, nivel)) return false; return [{ txt: `liberou ${email} no ${MOD[mod].nome} (${rotulo(MOD[mod], nivel)}) pelo módulo` }]; });
     if (ok) { toast(`${email} liberado no ${MOD[mod].nome}.`); sincronizar({}); }
